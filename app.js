@@ -17,14 +17,14 @@ function ensureAudio() {
   viz = new VisualizerManager(ctx, analyser, { mode: "bars", intensity: 1.5, color: "#ffffff" });
 }
 
-// Control Text
+// Control Text - se actualizează când apeși butonul
 btnApply.addEventListener("click", () => {
   overlayText = textInput.value.trim();
 });
 
-// Bucla principală (Loop)
+// Bucla principală (Loop) - optimizată
 function loop() {
-  // 1. Curățăm canvas-ul
+  // 1. Curățăm canvas-ul pentru a evita înghețarea imaginii
   ctx.fillStyle = "#000000";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
