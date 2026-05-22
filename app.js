@@ -1,4 +1,4 @@
-// ── MOTORUL VIZUAL INTEGRAT DIRECT ──
+// ── MOTORUL VIZUAL INTEGRAT DIRECT (Rezolvă problema ecranului negru) ──
 class VisualizerManager {
   constructor(ctx, analyser, options) {
     this.ctx = ctx;
@@ -18,6 +18,7 @@ class VisualizerManager {
   render(w, h, dt) {
     this.analyser.getByteFrequencyData(this.dataArray);
     
+    // Desenare fundal
     const bg = this.options.background;
     if (bg.type === 'gradient') {
       const grad = this.ctx.createLinearGradient(0, 0, 0, h);
@@ -29,6 +30,7 @@ class VisualizerManager {
     }
     this.ctx.fillRect(0, 0, w, h);
 
+    // Imagine de fundal defilabilă (Scrolling)
     if (this.scrollingImage && this.scrollingImage.complete) {
       this.scrollX += dt * 40;
       if (this.scrollX > this.scrollingImage.width) this.scrollX = 0;
@@ -40,6 +42,7 @@ class VisualizerManager {
       this.ctx.restore();
     }
 
+    // Efectele audio principale (Bars, Radial, Waveform)
     this.ctx.save();
     const mode = this.options.mode;
     const intensity = this.options.intensity || 1.5;
@@ -48,6 +51,7 @@ class VisualizerManager {
     this.ctx.lineWidth = 3;
 
     if (mode === 'radial' || mode === 'radialwave') {
+      // Mod Radial (Cerc reactiv)
       const centerX = w / 2, centerY = h / 2;
       let sum = 0; for(let i=0; i<100; i++) sum += this.dataArray[i];
       const avg = sum / 100;
@@ -65,6 +69,7 @@ class VisualizerManager {
       this.ctx.closePath();
       this.ctx.stroke();
     } else if (mode === 'wave') {
+      // Mod Waveform (Osciloscop liniar)
       this.analyser.getByteTimeDomainData(this.dataArray);
       this.ctx.beginPath();
       const sliceWidth = w / this.bufferLength;
@@ -78,6 +83,7 @@ class VisualizerManager {
       this.ctx.lineTo(w, h / 2);
       this.ctx.stroke();
     } else {
+      // Mod standard: BARS (Bare spectru verticale)
       const barWidth = (w / 64);
       let x = 0;
       for (let i = 0; i < 64; i++) {
@@ -88,6 +94,7 @@ class VisualizerManager {
     }
     this.ctx.restore();
 
+    // Imagine/Video din Centru (Center Media)
     if (this.centerMedia && this.centerMedia.el) {
       const cm = this.centerMedia;
       let sum = 0; for(let i=0; i<40; i++) sum += this.dataArray[i];
@@ -103,7 +110,7 @@ class VisualizerManager {
   }
 }
 
-// ── LOGICA INTERFEȚEI ──
+// ── LOGICA DE UI ȘI CONTROL INTERFAȚĂ ──
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d", { alpha: false });
 let dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
@@ -126,6 +133,12 @@ const btnPrev = document.getElementById("prev");
 const btnNext = document.getElementById("next");
 const modeSel = document.getElementById("mode");
 const intensityEl = document.getElementById("intensity");
+const strobeEl = document.getElementById("strobe");
+const imageInput = document.getElementById("image-input");
+const scrollImageInput = document.getElementById("scroll-image");
+const btnSuggestion = document.getElementById("add-suggestion");
+const btnRecord = document.getElementById("record");
+const btnExport = document.getElementById("export");
 const colorInput = document.getElementById("viz-color");
 const audioDeviceSel = document.getElementById("audio-device");
 const btnMicListen = document.getElementById("mic-listen");
@@ -136,16 +149,21 @@ const trackDisplay = document.getElementById("current-track-display");
 const bgTypeSel = document.getElementById("bg-type");
 const bgColor1 = document.getElementById("bg-color1");
 const bgColor2 = document.getElementById("bg-color2");
-const imageInput = document.getElementById("image-input");
+const bgImageInput = document.getElementById("bg-image");
+const bgImageWrap = document.getElementById("bg-image-wrap");
+const bgColor1Wrap = document.getElementById("bg-color1-wrap");
+const bgColor2Wrap = document.getElementById("bg-color2-wrap");
 
 let ac, analyser, gainA, gainB;
-let current = { index: -1, audio: null };
+let current = { index: -1, audio: null, src: null };
+let nextAudio = null;
 const clips = [];
+let mediaDest, recorder = null, recChunks = [];
 
 let micStream = null, micSource = null, micListening = false;
-let overlayText = "";
+let overlayText = "", overlayAlpha = 0, overlayFadeDir = 0, overlayTimer = null;
 let viz;
-let playing = false, lastT = performance.now();
+let playing = false, lastT = performance.now(), exportMode = false;
 
 function ensureAudio() {
   if (ac) return;
@@ -163,10 +181,13 @@ function ensureAudio() {
   gainB.connect(merger);
   merger.connect(analyser);
   analyser.connect(ac.destination);
+  mediaDest = ac.createMediaStreamDestination();
+  analyser.connect(mediaDest);
 
   viz = new VisualizerManager(ctx, analyser, {
     mode: modeSel.value,
     intensity: parseFloat(intensityEl.value),
+    strobe: strobeEl.checked,
     color: colorInput?.value || "#ffffff",
     background: {
       type: bgTypeSel.value,
@@ -176,70 +197,37 @@ function ensureAudio() {
   });
 }
 
-// ── CITIRE ȘI SCHIMBARE CORECTĂ AUDIO SOURCE DIN LAPTOP ──
 async function populateAudioDevices() {
   try {
     await navigator.mediaDevices.getUserMedia({ audio: true }).then(s => s.getTracks().forEach(t => t.stop()));
     const devices = await navigator.mediaDevices.enumerateDevices();
     const audioInputs = devices.filter(d => d.kind === "audioinput");
-    
     audioDeviceSel.innerHTML = "";
     audioInputs.forEach((d, i) => {
       const opt = document.createElement("option");
       opt.value = d.deviceId;
-      opt.textContent = d.label || `Sursă Audio ${i + 1}`;
+      opt.textContent = d.label || `Microfon ${i + 1}`;
       audioDeviceSel.appendChild(opt);
     });
-  } catch (err) { console.warn("Eroare la citirea listei audio:", err); }
+  } catch (err) { console.warn(err); }
 }
 populateAudioDevices();
-navigator.mediaDevices.addEventListener("devicechange", populateAudioDevices);
 
-// Re-legare dinamică la schimbarea selecției din drop-down în timp ce mic-ul merge
-audioDeviceSel.addEventListener("change", async () => {
-  if (micListening) {
-    // Repornim stream-ul automat pe noua placă/sursă aleasă
-    stopMicHardware();
-    startMicStream();
-  }
-});
-
-async function startMicStream() {
+btnMicListen.addEventListener("click", async () => {
   ensureAudio();
   if (ac.state === "suspended") await ac.resume();
+  if (micListening) { stopMicHardware(); trackDisplay.textContent = "Sursă: Playlist"; return; }
   stopAllMediaClips();
-  
-  const chosenDeviceId = audioDeviceSel.value;
-  const constraints = {
-    audio: chosenDeviceId ? { deviceId: { exact: chosenDeviceId } } : true
-  };
-
   try {
-    micStream = await navigator.mediaDevices.getUserMedia(constraints);
+    micStream = await navigator.mediaDevices.getUserMedia({ audio: audioDeviceSel.value ? { deviceId: { exact: audioDeviceSel.value } } : true });
     micSource = ac.createMediaStreamSource(micStream);
     micSource.connect(analyser);
     micListening = true;
     playing = true;
     btnMicListen.textContent = "🛑 Stop Mic";
     btnMicListen.classList.add("active");
-    
-    const label = audioDeviceSel.options[audioDeviceSel.selectedIndex]?.textContent || "Microfon";
-    trackDisplay.textContent = `Sursă activată din laptop: ${label}`;
-  } catch (err) {
-    alert("Nu s-a putut deschide sursa selectată: " + err.message);
-    micListening = false;
-    btnMicListen.textContent = "🎤 Listen Mic";
-    btnMicListen.classList.remove("active");
-  }
-}
-
-btnMicListen.addEventListener("click", () => {
-  if (micListening) {
-    stopMicHardware();
-    trackDisplay.textContent = "Sursă: Playlist";
-  } else {
-    startMicStream();
-  }
+    trackDisplay.textContent = "Sursă Activă: Microfon/Live Input";
+  } catch (err) { alert(err.message); }
 });
 
 function stopMicHardware() {
@@ -252,6 +240,7 @@ function stopMicHardware() {
 
 function stopAllMediaClips() {
   if (current.audio) { current.audio.pause(); try { current.audio.currentTime = 0; } catch{} }
+  if (nextAudio) { nextAudio.pause(); try { nextAudio.currentTime = 0; } catch{} }
   playing = false;
   btnPlay.textContent = "Play";
 }
@@ -259,11 +248,11 @@ function stopAllMediaClips() {
 function addClip(file) {
   const url = URL.createObjectURL(file);
   const isVideo = (file.type || "").startsWith("video") || /\.mp4$/i.test(file.name);
-  clips.push({ name: file.name, url, isVideo });
+  clips.push({ name: file.name, url, file, isVideo });
   renderList();
   if (current.index === -1) {
     current.index = 0;
-    trackDisplay.textContent = `Piesă pregătită: ${file.name}`;
+    trackDisplay.textContent = `Piesă selectată: ${file.name} (Gata de pornire)`;
   }
 }
 
@@ -273,32 +262,36 @@ fileInput.addEventListener("change", (e) => {
   fileInput.value = "";
 });
 
-// ── RENDER LISTĂ PIESE CU BUTOANE PLAY ȘI STOP ÎN DREAPTA ──
+// ── RENDER LISTĂ PIESE CU BUTOANE INTEGRATE PLAY ȘI STOP ÎN DREAPTA ──
 function renderList() {
   listEl.innerHTML = "";
   clips.forEach((c, i) => {
     const li = document.createElement("li");
     if (i === current.index && !micListening) li.classList.add("active");
     
+    // Nume piesă stânga
     const nameSpan = document.createElement("span");
-    nameSpan.textContent = truncate(c.name, 24);
+    nameSpan.textContent = truncate(c.name, 26);
     li.appendChild(nameSpan);
 
+    // Container butoane acțiuni dreapta
     const actionWrap = document.createElement("div");
     actionWrap.style.display = "inline-flex";
-    actionWrap.style.gap = "6px";
-    actionWrap.style.marginLeft = "12px";
+    actionWrap.style.gap = "4px";
+    actionWrap.style.marginLeft = "10px";
 
-    // Buton ▶ lângă track
+    // Buton mic PLAY dedicat piesei
     const itemPlay = document.createElement("button");
     itemPlay.textContent = "▶";
+    itemPlay.title = "Play piesa asta";
     itemPlay.style.padding = "2px 6px";
     itemPlay.style.fontSize = "11px";
     itemPlay.addEventListener("click", () => { stopMicHardware(); playIndex(i); });
 
-    // Buton ⏹ lângă track
+    // Buton mic STOP dedicat piesei
     const itemStop = document.createElement("button");
     itemStop.textContent = "⏹";
+    itemStop.title = "Oprește piesa asta";
     itemStop.style.padding = "2px 6px";
     itemStop.style.fontSize = "11px";
     itemStop.style.color = "#ff6b6b";
@@ -321,10 +314,11 @@ async function playIndex(index) {
 
   const media = clip.isVideo ? document.createElement("video") : new Audio();
   Object.assign(media, { src: clip.url, preload: "auto", crossOrigin: "anonymous", loop: false, playsInline: true });
-  media.addEventListener("ended", () => { btnNext.click(); });
+  media.addEventListener("ended", () => { if (exportMode) { stopRecording(); exportMode = false; } else { btnNext.click(); } });
 
   const srcNode = ac.createMediaElementSource(media);
   srcNode.connect(gainA);
+  
   gainA.gain.setValueAtTime(1, ac.currentTime);
   
   try {
@@ -358,6 +352,7 @@ btnNext.addEventListener("click", () => { if(clips.length) playIndex((current.in
 modeSel.addEventListener("change", () => viz && viz.setOptions({ mode: modeSel.value }));
 intensityEl.addEventListener("input", () => viz && viz.setOptions({ intensity: parseFloat(intensityEl.value) }));
 colorInput.addEventListener("input", () => viz && viz.setOptions({ color: colorInput.value }));
+
 bgTypeSel.addEventListener("change", () => viz && viz.setBackground({ type: bgTypeSel.value, color1: bgColor1.value, color2: bgColor2.value }));
 bgColor1.addEventListener("input", () => viz && viz.setBackground({ type: bgTypeSel.value, color1: bgColor1.value, color2: bgColor2.value }));
 bgColor2.addEventListener("input", () => viz && viz.setBackground({ type: bgTypeSel.value, color1: bgColor1.value, color2: bgColor2.value }));
@@ -367,7 +362,7 @@ imageInput.addEventListener("change", (e) => {
   if (file && viz) { const u = URL.createObjectURL(file); if (file.type.startsWith("video")) viz.setCenterMedia(u, "video"); else viz.setCenterMedia(u, "image"); }
 });
 
-btnApplyText.addEventListener("click", () => { overlayText = overlayTextInput.value.trim(); });
+btnApplyText.addEventListener("click", () => { overlayText = overlayTextInput.value.trim(); overlayAlpha = 1; });
 
 function loop(t) {
   const dt = Math.min(0.05, (t - lastT) / 1000); lastT = t;
