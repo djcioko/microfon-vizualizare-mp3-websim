@@ -20,13 +20,20 @@
         + Center Media
         <input id="image-input" type="file" accept="image/*,video/*" hidden>
       </label>
+      <label class="button">
+        + Scrolling Image
+        <input id="scroll-image" type="file" accept="image/*" hidden>
+      </label>
+      <button id="add-suggestion">Add Suggestion Image</button>
       <button id="prev">Prev</button>
       <button id="playpause">Play</button>
       <button id="stop">Stop</button>
+      <button id="record">Record</button>
+      <button id="export">Export Video</button>
       <button id="next">Next</button>
 
-      <select id="audio-device" title="Schimbă Sursa Audio" style="border-color: #4EF05D; color: #4EF05D;">
-        <option value="">Se încarcă listă echipamente...</option>
+      <select id="audio-device" title="Audio Input Device">
+        <option value="">🎤 Default Mic</option>
       </select>
       <button id="mic-listen">🎤 Listen Mic</button>
 
@@ -49,6 +56,9 @@
         Color
         <input id="viz-color" type="color" value="#ffffff">
       </label>
+      <label class="inline">
+        <input id="strobe" type="checkbox" checked> Strobe
+      </label>
       <select id="bg-type">
         <option value="solid">Solid</option>
         <option value="gradient">Gradient</option>
@@ -62,7 +72,7 @@
     </div>
 
     <div id="current-track-display" style="font-size: 13px; font-weight: 600; color: #4EF05D; padding: 4px 2px;">
-      Sursă: Nicio piesă sau microfon deschis
+      Sursă: Nicio piesă încărcată
     </div>
 
     <ul id="clip-list"></ul>
