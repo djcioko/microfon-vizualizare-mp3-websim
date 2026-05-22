@@ -1,25 +1,53 @@
 <!doctype html>
-<html lang="ro">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Visualizer</title>
+  <title>Custom Song Visualizer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
   <div id="ui">
     <div class="controls">
-      <label class="button"> + Add Clip <input id="file-input" type="file" accept="audio/*,video/*" multiple hidden> </label>
+      <label class="button">+ Add Clip <input id="file-input" type="file" accept="audio/*,video/*" multiple hidden></label>
+      <label class="button">+ Center Media <input id="image-input" type="file" accept="image/*,video/*" hidden></label>
+      <label class="button">+ Scrolling Image <input id="scroll-image" type="file" accept="image/*" hidden></label>
+      
+      <button id="prev">Prev</button>
       <button id="playpause">Play</button>
       <button id="stop">Stop</button>
+      <button id="next">Next</button>
+
+      <select id="audio-device"><option value="">🎤 Default Mic</option></select>
+      <button id="mic-listen">🎤 Listen Mic</button>
+
+      <input id="overlay-text" type="text" placeholder="Overlay text..." maxlength="80">
+      <button id="apply-text">Add Text</button>
+
+      <select id="mode">
+        <option value="bars">Bars</option>
+        <option value="radial">Radial</option>
+        <option value="wave">Waveform</option>
+      </select>
       
-      <input id="overlay-text" type="text" placeholder="Text peste..." maxlength="80">
-      <button id="apply-text">Adaugă Text</button>
+      <input id="intensity" type="range" min="0.5" max="3" step="0.1" value="1.5">
+      <input id="viz-color" type="color" value="#ffffff">
+      
+      <select id="bg-type">
+        <option value="solid">Solid</option>
+        <option value="gradient">Gradient</option>
+      </select>
+      <input id="bg-color1" type="color" value="#000000">
+      <input id="bg-color2" type="color" value="#202020">
     </div>
+
+    <div id="current-track-display" style="font-size: 13px; color: #4EF05D; padding: 4px;">Sursă: Nicio piesă</div>
     <ul id="clip-list"></ul>
   </div>
   <canvas id="canvas"></canvas>
   <script type="module" src="./app.js"></script>
 </body>
-</html>
 </html>
