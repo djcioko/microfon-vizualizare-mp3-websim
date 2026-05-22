@@ -1,5 +1,8 @@
-body { margin: 0; background: #000; color: #fff; overflow: hidden; font-family: sans-serif; }
-#ui { position: fixed; top: 0; z-index: 10; padding: 15px; background: rgba(0,0,0,0.9); width: 100%; }
-.controls { display: flex; gap: 10px; }
-#canvas { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; }
-button { cursor: pointer; padding: 5px 15px; }
+:root { color-scheme: dark; }
+html, body { margin: 0; height: 100%; background: #000; color: #fff; font-family: sans-serif; overflow: hidden; }
+#ui { position: fixed; top: 0; left: 0; right: 0; padding: 12px; background: rgba(0,0,0,0.8); z-index: 2; }
+.controls { display: flex; gap: 10px; align-items: center; }
+.button, button { background: #111; border: 1px solid #333; color: #fff; padding: 8px 12px; border-radius: 6px; cursor: pointer; }
+#canvas { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 1; }
+#clip-list { list-style: none; margin: 10px 0 0 0; padding: 0; display: flex; gap: 8px; }
+#clip-list li { background: #222; padding: 6px 10px; border-radius: 6px; font-size: 12px; }
