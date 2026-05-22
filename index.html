@@ -3,17 +3,19 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Visualizer Pro</title>
+  <title>Custom Visualizer</title>
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
   <div id="ui">
     <div class="controls">
-      <input id="file-input" type="file" accept="audio/*,video/*" multiple>
+      <label class="button"> + Add Clip <input id="file-input" type="file" accept="audio/*,video/*" multiple hidden> </label>
       <button id="playpause">Play</button>
       <button id="stop">Stop</button>
       
-      <input id="overlay-text" type="text" placeholder="Text..." maxlength="50">
+      <label class="inline">
+        <input id="overlay-text" type="text" placeholder="Text peste..." maxlength="80">
+      </label>
       <button id="apply-text">Adaugă Text</button>
     </div>
     <ul id="clip-list"></ul>
