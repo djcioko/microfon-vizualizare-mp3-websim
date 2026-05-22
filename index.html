@@ -2,44 +2,23 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Custom Song Visualizer</title>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600&display=swap" rel="stylesheet">
+  <title>Visualizer</title>
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
   <div id="ui">
     <div class="controls">
-      <label class="button">+ Add Clip <input id="file-input" type="file" accept="audio/*,video/*" multiple hidden></label>
-      <label class="button">+ Center Media <input id="image-input" type="file" accept="image/*,video/*" hidden></label>
+      <input id="file-input" type="file" accept="audio/*,video/*" multiple>
       <button id="playpause">Play</button>
       <button id="stop">Stop</button>
-      
       <select id="audio-device"><option value="">🎤 Default Mic</option></select>
       <button id="mic-listen">🎤 Listen Mic</button>
-
-      <input id="overlay-text" type="text" placeholder="Overlay text..." maxlength="80">
+      <input id="overlay-text" type="text" placeholder="Text..." maxlength="80">
       <button id="apply-text">Add Text</button>
-
-      <select id="mode">
-        <option value="bars">Bars</option>
-        <option value="radial">Radial</option>
-        <option value="wave">Waveform</option>
-      </select>
-      
-      <input id="intensity" type="range" min="0.5" max="3" step="0.1" value="1.5">
-      <input id="viz-color" type="color" value="#ffffff">
-      <select id="bg-type">
-        <option value="solid">Solid</option>
-        <option value="gradient">Gradient</option>
-      </select>
-      <input id="bg-color1" type="color" value="#000000">
-      <input id="bg-color2" type="color" value="#202020">
     </div>
-    <div id="current-track-display">Sursă: Nicio piesă</div>
-    <ul id="clip-list"></ul>
   </div>
   <canvas id="canvas"></canvas>
-  <script type="module" src="./app.js"></script>
+  <script src="./app.js"></script>
 </body>
+</html>
 </html>
