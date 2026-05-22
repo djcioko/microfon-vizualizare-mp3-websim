@@ -1,5 +1,84 @@
-body { margin: 0; background: #000; color: #fff; overflow: hidden; font-family: sans-serif; }
-#ui { position: fixed; top: 0; width: 100%; padding: 10px; background: #111; z-index: 10; }
-#canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; }
-.controls { display: flex; gap: 10px; }
-button, select, input { padding: 8px; background: #222; color: #fff; border: 1px solid #444; }
+:root { 
+  color-scheme: dark; 
+}
+
+html, body { 
+  margin: 0; 
+  height: 100%; 
+  background: #000; 
+  color: #fff; 
+  font-family: "Noto Sans", system-ui, sans-serif; 
+  overflow: hidden; 
+}
+
+/* Bara de control superioară (UI) */
+#ui { 
+  position: fixed; 
+  top: 0; 
+  left: 0; 
+  right: 0; 
+  padding: 10px; 
+  background: rgba(0,0,0,0.9); 
+  z-index: 10; 
+  border-bottom: 1px solid #333;
+}
+
+.controls { 
+  display: flex; 
+  gap: 8px; 
+  align-items: center; 
+  flex-wrap: wrap; 
+}
+
+/* Stil general pentru butoane, select-uri și input-uri */
+button, select, input { 
+  background: #222; 
+  color: #fff; 
+  border: 1px solid #444; 
+  padding: 6px 10px; 
+  border-radius: 6px; 
+  cursor: pointer; 
+  font-size: 13px;
+}
+
+button:hover { 
+  background: #333; 
+  border-color: #666; 
+}
+
+/* Canvas-ul ocupă tot spațiul rămas */
+#canvas { 
+  position: fixed; 
+  top: 0; 
+  left: 0; 
+  width: 100%; 
+  height: 100%; 
+  z-index: 1; 
+  display: block;
+}
+
+/* Afișajul piesei curente */
+#current-track-display {
+  margin-top: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #4EF05D;
+}
+
+/* Lista de clipuri */
+#clip-list { 
+  list-style: none; 
+  margin: 8px 0 0 0; 
+  padding: 0; 
+  display: flex; 
+  gap: 8px; 
+  overflow-x: auto; 
+}
+
+#clip-list li { 
+  background: #222; 
+  padding: 6px 10px; 
+  border-radius: 6px; 
+  font-size: 12px; 
+  white-space: nowrap; 
+}
