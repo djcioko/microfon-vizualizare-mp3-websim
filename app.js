@@ -1,55 +1,55 @@
-import { VisualizerManager } from "./visualizers.js";
-
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d", { alpha: false });
-const audioDeviceSel = document.getElementById("audio-device");
-const btnMicListen = document.getElementById("mic-listen");
-const btnApplyText = document.getElementById("apply-text");
-const overlayTextInput = document.getElementById("overlay-text");
+let ac, analyser, viz, playing = false, overlayText = "";
 
-let viz, ac, analyser, micStream, micSource;
-let overlayText = "";
-let playing = false, lastT = performance.now();
-
+// Inițializare Audio
 function ensureAudio() {
-  if (ac) return;
-  ac = new (window.AudioContext || window.webkitAudioContext)();
-  analyser = ac.createAnalyser();
-  analyser.connect(ac.destination);
-  viz = new VisualizerManager(ctx, analyser, { mode: "bars", intensity: 1.5, color: "#ffffff" });
+    if (ac) return;
+    ac = new (window.AudioContext || window.webkitAudioContext)();
+    analyser = ac.createAnalyser();
+    analyser.connect(ac.destination);
 }
 
-// Microfon Logic
+// Logica Microfon
 async function populateAudioDevices() {
-  const devices = await navigator.mediaDevices.enumerateDevices();
-  devices.filter(d => d.kind === "audioinput").forEach(d => {
-    const opt = document.createElement("option");
-    opt.value = d.deviceId; opt.textContent = d.label || "Microfon";
-    audioDeviceSel.appendChild(opt);
-  });
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const sel = document.getElementById("audio-device");
+    devices.filter(d => d.kind === "audioinput").forEach(d => {
+        const opt = document.createElement("option");
+        opt.value = d.deviceId; opt.textContent = d.label || "Mic";
+        sel.appendChild(opt);
+    });
 }
 populateAudioDevices();
 
-btnMicListen.addEventListener("click", async () => {
-  ensureAudio();
-  if (ac.state === "suspended") await ac.resume();
-  micStream = await navigator.mediaDevices.getUserMedia({ audio: { deviceId: audioDeviceSel.value ? { exact: audioDeviceSel.value } : undefined } });
-  micSource = ac.createMediaStreamSource(micStream);
-  micSource.connect(analyser);
-  playing = true;
+// Buton Text
+document.getElementById("apply-text").addEventListener("click", () => {
+    overlayText = document.getElementById("overlay-text").value;
 });
 
-btnApplyText.addEventListener("click", () => { overlayText = overlayTextInput.value; });
+// Bucla de desenare
+function loop() {
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-function loop(t) {
-  const dt = (t - lastT) / 1000; lastT = t;
-  ctx.fillStyle = "#000"; ctx.fillRect(0, 0, canvas.width, canvas.height);
-  if (viz) viz.render(canvas.width, canvas.height, dt);
-  if (overlayText) {
-    ctx.fillStyle = "#fff"; ctx.font = "40px sans-serif";
-    ctx.textAlign = "center"; ctx.fillText(overlayText, canvas.width / 2, canvas.height * 0.9);
-  }
-  requestAnimationFrame(loop);
+    if (analyser) {
+        const buffer = new Uint8Array(analyser.frequencyBinCount);
+        analyser.getByteFrequencyData(buffer);
+        // Vizualizare bare simplă
+        ctx.fillStyle = "#ffffff";
+        for (let i = 0; i < 64; i++) {
+            ctx.fillRect(i * (canvas.width/64), canvas.height - buffer[i]*1.5, 10, buffer[i]*1.5);
+        }
+    }
+
+    if (overlayText) {
+        ctx.fillStyle = "#fff";
+        ctx.font = "bold 50px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(overlayText, canvas.width / 2, canvas.height * 0.9);
+    }
+    requestAnimationFrame(loop);
 }
+
 ensureAudio();
-loop(performance.now());
+loop();
