@@ -1,55 +1,28 @@
-const canvas = document.getElementById("canvas");
-const ctx = canvas.getContext("2d", { alpha: false });
-let ac, analyser, viz, playing = false, overlayText = "";
-
-// Inițializare Audio
-function ensureAudio() {
-    if (ac) return;
-    ac = new (window.AudioContext || window.webkitAudioContext)();
-    analyser = ac.createAnalyser();
-    analyser.connect(ac.destination);
-}
-
-// Logica Microfon
-async function populateAudioDevices() {
-    const devices = await navigator.mediaDevices.enumerateDevices();
-    const sel = document.getElementById("audio-device");
-    devices.filter(d => d.kind === "audioinput").forEach(d => {
-        const opt = document.createElement("option");
-        opt.value = d.deviceId; opt.textContent = d.label || "Mic";
-        sel.appendChild(opt);
-    });
-}
-populateAudioDevices();
-
-// Buton Text
-document.getElementById("apply-text").addEventListener("click", () => {
-    overlayText = document.getElementById("overlay-text").value;
-});
-
-// Bucla de desenare
-function loop() {
-    ctx.fillStyle = "#000";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    if (analyser) {
-        const buffer = new Uint8Array(analyser.frequencyBinCount);
-        analyser.getByteFrequencyData(buffer);
-        // Vizualizare bare simplă
-        ctx.fillStyle = "#ffffff";
+// Definirea clasei direct aici, fără importuri externe
+class VisualizerManager {
+    constructor(ctx, analyser, options) {
+        this.ctx = ctx;
+        this.analyser = analyser;
+        this.options = options;
+        this.dataArray = new Uint8Array(analyser.frequencyBinCount);
+    }
+    setOptions(opts) { Object.assign(this.options, opts); }
+    setBackground(bg) { Object.assign(this.options.background, bg); }
+    
+    render(w, h, dt) {
+        this.analyser.getByteFrequencyData(this.dataArray);
+        this.ctx.fillStyle = "#000";
+        this.ctx.fillRect(0, 0, w, h);
+        
+        this.ctx.fillStyle = this.options.color || '#ffffff';
+        const barWidth = (w / 64);
         for (let i = 0; i < 64; i++) {
-            ctx.fillRect(i * (canvas.width/64), canvas.height - buffer[i]*1.5, 10, buffer[i]*1.5);
+            const barHeight = this.dataArray[i] * (this.options.intensity || 1.5);
+            this.ctx.fillRect(i * barWidth, h - barHeight, barWidth - 2, barHeight);
         }
     }
-
-    if (overlayText) {
-        ctx.fillStyle = "#fff";
-        ctx.font = "bold 50px sans-serif";
-        ctx.textAlign = "center";
-        ctx.fillText(overlayText, canvas.width / 2, canvas.height * 0.9);
-    }
-    requestAnimationFrame(loop);
 }
 
-ensureAudio();
-loop();
+// RESTUL CODULUI TĂU DE UI (cel pe care îl aveai deja)
+// ... (păstrează tot codul de după clasa VisualizerManager din fișierul tău original)
+// Asigură-te doar că la finalul fișierului NU mai ai nicio acoladă `}` în plus.
