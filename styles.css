@@ -1,14 +1,250 @@
-:root { color-scheme: dark; }
-html, body { margin: 0; height: 100%; background: #000; color: #fff; font-family: "Noto Sans", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
-#ui { position: fixed; top: 0; left: 0; right: 0; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; background: linear-gradient(180deg, rgba(0,0,0,.85), rgba(0,0,0,0)); pointer-events: auto; z-index: 2; }
-.controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.button, button { background: #111; border: 1px solid #222; color: #fff; padding: 6px 10px; border-radius: 6px; cursor: pointer; }
-.button:hover, button:hover { background: #1c1c1c; border-color: #444; }
-#stop { border-color: #5a1a1a; color: #ff6b6b; }
-#mic-listen.active { background: #3a0505; border-color: #cc3333; }
-select, input[type="range"] { background: #0f0f0f; color: #fff; border: 1px solid #222; border-radius: 6px; padding: 6px; }
-.inline { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; }
-#clip-list { list-style: none; margin: 4px 0 0 0; padding: 0; display: flex; gap: 8px; overflow-x: auto; }
-#clip-list li { background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.15); border-radius: 8px; padding: 6px 10px; display: inline-flex; align-items: center; justify-content: space-between; font-size: 12px; }
-#clip-list li.active { border-color: #4EF05D; background: rgba(78, 240, 93, 0.1); }
-#canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; z-index: 1; }
+:root {
+  --ui-bg: rgba(8, 10, 14, 0.78);
+  --ui-border: rgba(255, 255, 255, 0.12);
+  --accent: #4ef05d;
+  --accent-2: #6ee7ff;
+  --danger: #ff5b6e;
+  --text: #f3f6f8;
+  --muted: #9aa3ad;
+  --shadow: 0 10px 40px rgba(0, 0, 0, 0.45);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #000;
+  color: var(--text);
+  font-family: "Noto Sans", system-ui, sans-serif;
+}
+
+#canvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  display: block;
+  z-index: 1;
+  background: #000;
+}
+
+#hidden-media {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+  left: -9999px;
+}
+
+#ui {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  z-index: 20;
+  pointer-events: none;
+  transition: opacity 0.28s ease, transform 0.28s ease;
+}
+
+#ui.hidden-ui {
+  opacity: 0;
+  transform: translateY(-8px);
+  pointer-events: none;
+}
+
+#ui:not(.hidden-ui) {
+  pointer-events: none;
+}
+
+#ui:not(.hidden-ui) .controls,
+#ui:not(.hidden-ui) #current-track-display,
+#ui:not(.hidden-ui) #clip-list,
+#ui:not(.hidden-ui) .toggles {
+  pointer-events: auto;
+}
+
+.controls, .toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  background: var(--ui-bg);
+  border: 1px solid var(--ui-border);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  padding: 10px;
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+}
+
+.toggles {
+  margin-top: 8px;
+}
+
+.button, button, select, label.inline, label.button {
+  font: 600 12px/1.2 "Noto Sans", system-ui, sans-serif;
+  color: var(--text);
+}
+
+.button, button {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--ui-border);
+  border-radius: 10px;
+  padding: 8px 11px;
+  cursor: pointer;
+  color: var(--text);
+}
+
+.button:hover, button:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+button.active, .toggle-btn.active {
+  background: rgba(78, 240, 93, 0.18);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+button.danger.active {
+  background: rgba(255, 91, 110, 0.2);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+select, input[type="text"] {
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--ui-border);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 7px 9px;
+}
+
+input[type="text"] { min-width: 160px; }
+
+label.inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--ui-border);
+  border-radius: 10px;
+  padding: 6px 9px;
+}
+
+label.button { cursor: pointer; display: inline-block; }
+
+input[type="range"] { width: 90px; accent-color: var(--accent); }
+input[type="color"] {
+  width: 28px;
+  height: 20px;
+  border: 0;
+  background: none;
+  padding: 0;
+}
+
+#current-track-display {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  padding: 8px 4px 2px;
+  text-shadow: 0 1px 8px rgba(0,0,0,0.7);
+}
+
+#clip-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  max-height: 140px;
+  overflow: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+#clip-list li {
+  background: rgba(8, 10, 14, 0.72);
+  border: 1px solid var(--ui-border);
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+#clip-list li.playing {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #555;
+}
+.toggle-btn.active .dot { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+.toggle-btn.danger.active .dot { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
+
+#dock {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  z-index: 40;
+  display: flex;
+  gap: 10px;
+  pointer-events: auto;
+}
+
+#dock button {
+  min-width: 54px;
+  height: 54px;
+  border-radius: 999px;
+  background: rgba(8, 10, 14, 0.82);
+  border: 1px solid rgba(255,255,255,0.18);
+  backdrop-filter: blur(16px);
+  box-shadow: var(--shadow);
+  font-size: 20px;
+  display: grid;
+  place-items: center;
+  padding: 0 16px;
+}
+
+#dock #toggle-ui {
+  min-width: 168px;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+}
+
+#status-toast {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 50;
+  background: rgba(0,0,0,0.72);
+  border: 1px solid var(--ui-border);
+  padding: 12px 18px;
+  border-radius: 12px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+#status-toast.show { opacity: 1; }
+
+@media (max-width: 720px) {
+  .controls, .toggles { padding: 8px; gap: 6px; }
+  button, .button, select { font-size: 11px; padding: 7px 8px; }
+  #dock #toggle-ui { min-width: 140px; }
+}
