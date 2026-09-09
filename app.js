@@ -1,64 +1,696 @@
-// ── MOTORUL VIZUAL INTEGRAT DIRECT (Rezolvă problema ecranului negru) ──
-class VisualizerManager {
-  constructor(ctx, analyser, options) {
-    this.ctx = ctx;
-    this.analyser = analyser;
-    this.options = options;
-    this.bufferLength = analyser.frequencyBinCount;
-    this.dataArray = new Uint8Array(this.bufferLength);
-    this.centerMedia = null;
-    this.scrollingImage = null;
-    this.scrollX = 0;
+const $ = (id) => document.getElementById(id);
+
+const canvas = $("canvas");
+const ctx = canvas.getContext("2d", { alpha: false });
+
+const fileInput = $("file-input");
+const imageInput = $("image-input");
+const scrollImageInput = $("scroll-image");
+const pngInput = $("png-input");
+const videoFileInput = $("video-file-input");
+
+const playBtn = $("playpause");
+const prevBtn = $("prev");
+const nextBtn = $("next");
+const stopBtn = $("stop");
+const recordBtn = $("record");
+const exportBtn = $("export");
+const modeSel = $("mode");
+const intensityEl = $("intensity");
+const colorEl = $("viz-color");
+const strobeEl = $("strobe");
+const bgTypeEl = $("bg-type");
+const bg1El = $("bg-color1");
+const bg2El = $("bg-color2");
+const overlayTextEl = $("overlay-text");
+const applyTextBtn = $("apply-text");
+const clipList = $("clip-list");
+const trackDisplay = $("current-track-display");
+const audioDeviceSel = $("audio-device");
+const micListenBtn = $("mic-listen");
+const addSuggestionBtn = $("add-suggestion");
+const toggleUiBtn = $("toggle-ui");
+const fullscreenBtn = $("fullscreen-btn");
+const toast = $("status-toast");
+
+const hiddenAudio = $("hidden-audio");
+const hiddenVideo = $("hidden-video");
+const overlayVideo = $("overlay-video");
+const cameraVideo = $("camera-video");
+const centerMediaEl = $("center-media");
+const pngImage = $("png-image");
+const scrollImg = $("scroll-img");
+
+const state = {
+  clips: [],
+  index: 0,
+  playing: false,
+  audioCtx: null,
+  analyser: null,
+  sourceNode: null,
+  micStream: null,
+  micSource: null,
+  micOn: false,
+  freq: new Uint8Array(1024),
+  time: new Uint8Array(1024),
+  overlayText: "",
+  texts: [],
+  centerMedia: null,
+  centerKind: null,
+  centerOn: true,
+  pngOn: false,
+  videoFileOn: false,
+  cameraOn: false,
+  cameraStream: null,
+  scrollOn: false,
+  scrollX: 0,
+  suggestionOn: false,
+  suggestionImg: null,
+  recorder: null,
+  chunks: [],
+  recording: false,
+  lastExportUrl: null,
+  uiHidden: false,
+  particles: [],
+  ripples: [],
+  t: 0,
+  pngY: 0,
+  pngV: 0,
+  pngSquash: 1,
+  pngLastBeat: 0,
+};
+
+function toastMsg(msg) {
+  toast.textContent = msg;
+  toast.classList.add("show");
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => toast.classList.remove("show"), 1600);
+}
+
+function resize() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = Math.floor(innerWidth * dpr);
+  canvas.height = Math.floor(innerHeight * dpr);
+  canvas.style.width = innerWidth + "px";
+  canvas.style.height = innerHeight + "px";
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+window.addEventListener("resize", resize);
+resize();
+
+async function ensureAudio() {
+  if (!state.audioCtx) {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    state.audioCtx = new Ctx();
+    state.analyser = state.audioCtx.createAnalyser();
+    state.analyser.fftSize = 2048;
+    state.analyser.smoothingTimeConstant = 0.78;
+    state.freq = new Uint8Array(state.analyser.frequencyBinCount);
+    state.time = new Uint8Array(state.analyser.fftSize);
+    const gain = state.audioCtx.createGain();
+    gain.gain.value = 1;
+    state.analyser.connect(gain);
+    gain.connect(state.audioCtx.destination);
+    state.outGain = gain;
   }
-  setOptions(opts) { Object.assign(this.options, opts); }
-  setBackground(bg) { Object.assign(this.options.background, bg); }
-  setCenterMedia(url, type) { this.centerMedia = { url, type, el: null }; if(type==='video'){const v=document.createElement('video');v.src=url;v.loop=true;v.muted=true;v.play().catch(()=>{});this.centerMedia.el=v;}else{const img=new Image();img.src=url;this.centerMedia.el=img;} }
-  setScrollingImage(url) { const img=new Image();img.src=url;this.scrollingImage=img; }
-  
-  render(w, h, dt) {
-    this.analyser.getByteFrequencyData(this.dataArray);
-    
-    // Desenare fundal
-    const bg = this.options.background;
-    if (bg.type === 'gradient') {
-      const grad = this.ctx.createLinearGradient(0, 0, 0, h);
-      grad.addColorStop(0, bg.color1);
-      grad.addColorStop(1, bg.color2);
-      this.ctx.fillStyle = grad;
+  if (state.audioCtx.state === "suspended") await state.audioCtx.resume();
+}
+
+function disconnectSource() {
+  try { state.sourceNode && state.sourceNode.disconnect(); } catch {}
+  state.sourceNode = null;
+}
+
+function hookMediaElement(el) {
+  disconnectSource();
+  if (!state.audioCtx) return;
+  try {
+    if (!el._mediaNode) el._mediaNode = state.audioCtx.createMediaElementSource(el);
+    state.sourceNode = el._mediaNode;
+    state.sourceNode.connect(state.analyser);
+  } catch (e) {
+    console.warn(e);
+  }
+}
+
+function updateTrackLabel() {
+  const clip = state.clips[state.index];
+  trackDisplay.textContent = clip
+    ? `Sursă: ${clip.name}${state.playing ? "  ▶" : ""}`
+    : state.micOn
+      ? "Sursă: Microfon"
+      : "Sursă: Nicio piesă încărcată";
+}
+
+function renderClipList() {
+  clipList.innerHTML = "";
+  state.clips.forEach((c, i) => {
+    const li = document.createElement("li");
+    li.textContent = `${i + 1}. ${c.name}`;
+    if (i === state.index) li.classList.add("playing");
+    li.onclick = () => { state.index = i; playCurrent(); };
+    clipList.appendChild(li);
+  });
+}
+
+function addFiles(fileList, asClips = true) {
+  [...fileList].forEach((file) => {
+    const url = URL.createObjectURL(file);
+    const isVideo = file.type.startsWith("video/");
+    const isAudio = file.type.startsWith("audio/");
+    if (asClips && (isAudio || isVideo)) {
+      state.clips.push({ name: file.name, url, type: isVideo ? "video" : "audio", file });
+    }
+  });
+  renderClipList();
+  updateTrackLabel();
+  if (state.clips.length && !state.playing) {
+    state.index = state.clips.length - 1;
+    renderClipList();
+    updateTrackLabel();
+  }
+}
+
+fileInput.addEventListener("change", (e) => {
+  addFiles(e.target.files, true);
+  e.target.value = "";
+});
+
+function setCenterFromFile(file) {
+  if (!file) return;
+  const url = URL.createObjectURL(file);
+  if (file.type.startsWith("video/")) {
+    centerMediaEl.pause?.();
+    hiddenVideo.src = url;
+    hiddenVideo.loop = true;
+    hiddenVideo.muted = true;
+    hiddenVideo.play().catch(() => {});
+    state.centerMedia = hiddenVideo;
+    state.centerKind = "video";
+  } else {
+    const img = new Image();
+    img.onload = () => {
+      state.centerMedia = img;
+      state.centerKind = "image";
+    };
+    img.src = url;
+    centerMediaEl.src = url;
+  }
+  state.centerOn = true;
+  $("toggle-center").classList.add("active");
+  toastMsg("Media centrală încărcată");
+}
+
+imageInput.addEventListener("change", (e) => {
+  const f = e.target.files[0];
+  setCenterFromFile(f);
+  e.target.value = "";
+});
+
+pngInput.addEventListener("change", (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const url = URL.createObjectURL(f);
+  pngImage.onload = () => {
+    state.pngOn = true;
+    $("toggle-png").classList.add("active");
+    toastMsg("PNG overlay ON");
+  };
+  pngImage.src = url;
+  e.target.value = "";
+});
+
+videoFileInput.addEventListener("change", (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  overlayVideo.src = URL.createObjectURL(f);
+  overlayVideo.loop = true;
+  overlayVideo.muted = true;
+  overlayVideo.play().catch(() => {});
+  state.videoFileOn = true;
+  $("toggle-video").classList.add("active");
+  toastMsg("Video overlay ON");
+  e.target.value = "";
+});
+
+scrollImageInput.addEventListener("change", (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const url = URL.createObjectURL(f);
+  scrollImg.onload = () => {
+    state.scrollOn = true;
+    $("toggle-scroll").classList.add("active");
+    toastMsg("Imagine scrolling ON");
+  };
+  scrollImg.src = url;
+  e.target.value = "";
+});
+
+addSuggestionBtn.addEventListener("click", () => {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="640">
+    <defs>
+      <radialGradient id="g" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stop-color="#6ee7ff"/>
+        <stop offset="55%" stop-color="#4ef05d"/>
+        <stop offset="100%" stop-color="#08100c"/>
+      </radialGradient>
+    </defs>
+    <rect width="100%" height="100%" fill="#050505"/>
+    <circle cx="320" cy="320" r="240" fill="url(#g)" opacity="0.9"/>
+    <text x="320" y="340" text-anchor="middle" font-size="72" fill="#fff" font-family="Noto Sans">VIZ</text>
+  </svg>`;
+  const img = new Image();
+  img.onload = () => {
+    state.suggestionImg = img;
+    state.suggestionOn = true;
+    $("toggle-suggest").classList.add("active");
+    toastMsg("Suggestion image ON");
+  };
+  img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+});
+
+$("toggle-png").addEventListener("click", () => {
+  if (!pngImage.src) {
+    pngInput.click();
+    return;
+  }
+  state.pngOn = !state.pngOn;
+  $("toggle-png").classList.toggle("active", state.pngOn);
+});
+
+$("toggle-video").addEventListener("click", () => {
+  if (!overlayVideo.src) {
+    videoFileInput.click();
+    return;
+  }
+  state.videoFileOn = !state.videoFileOn;
+  $("toggle-video").classList.toggle("active", state.videoFileOn);
+  if (state.videoFileOn) overlayVideo.play().catch(() => {});
+  else overlayVideo.pause();
+});
+
+$("toggle-center").addEventListener("click", () => {
+  state.centerOn = !state.centerOn;
+  $("toggle-center").classList.toggle("active", state.centerOn);
+});
+
+$("toggle-scroll").addEventListener("click", () => {
+  if (!scrollImg.src) {
+    scrollImageInput.click();
+    return;
+  }
+  state.scrollOn = !state.scrollOn;
+  $("toggle-scroll").classList.toggle("active", state.scrollOn);
+});
+
+$("toggle-suggest").addEventListener("click", () => {
+  state.suggestionOn = !state.suggestionOn;
+  $("toggle-suggest").classList.toggle("active", state.suggestionOn);
+});
+
+async function toggleCamera() {
+  if (state.cameraOn) {
+    state.cameraStream?.getTracks().forEach((t) => t.stop());
+    cameraVideo.srcObject = null;
+    state.cameraStream = null;
+    state.cameraOn = false;
+    $("toggle-camera").classList.remove("active");
+    toastMsg("Cameră OFF");
+    return;
+  }
+  try {
+    state.cameraStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "user", width: { ideal: 1920 }, height: { ideal: 1080 } },
+      audio: false,
+    });
+    cameraVideo.srcObject = state.cameraStream;
+    await cameraVideo.play();
+    state.cameraOn = true;
+    $("toggle-camera").classList.add("active");
+    toastMsg("Cameră ON — fullscreen");
+  } catch (err) {
+    toastMsg("Camera indisponibilă: " + err.message);
+  }
+}
+$("toggle-camera").addEventListener("click", toggleCamera);
+
+applyTextBtn.addEventListener("click", () => {
+  const t = overlayTextEl.value.trim();
+  if (!t) return;
+  state.overlayText = t;
+  state.texts.push({
+    text: t,
+    x: 0.5,
+    y: 0.18 + (state.texts.length % 5) * 0.08,
+    life: 1,
+  });
+  toastMsg("Text adăugat");
+});
+
+async function playCurrent() {
+  await ensureAudio();
+  const clip = state.clips[state.index];
+  if (!clip) {
+    toastMsg("Adaugă un clip audio/video");
+    return;
+  }
+  hiddenAudio.pause();
+  hiddenVideo.pause();
+  hiddenAudio.removeAttribute("src");
+  if (clip.type === "video") {
+    hiddenVideo.src = clip.url;
+    hiddenVideo.loop = false;
+    hookMediaElement(hiddenVideo);
+    await hiddenVideo.play();
+    state.centerMedia = hiddenVideo;
+    state.centerKind = "video";
+    state.centerOn = true;
+    $("toggle-center").classList.add("active");
+  } else {
+    hiddenAudio.src = clip.url;
+    hookMediaElement(hiddenAudio);
+    await hiddenAudio.play();
+  }
+  state.playing = true;
+  playBtn.textContent = "Pause";
+  updateTrackLabel();
+  renderClipList();
+}
+
+function pauseAll() {
+  hiddenAudio.pause();
+  hiddenVideo.pause();
+  state.playing = false;
+  playBtn.textContent = "Play";
+  updateTrackLabel();
+}
+
+playBtn.addEventListener("click", async () => {
+  if (state.playing) pauseAll();
+  else await playCurrent();
+});
+
+stopBtn.addEventListener("click", () => {
+  pauseAll();
+  hiddenAudio.currentTime = 0;
+  hiddenVideo.currentTime = 0;
+});
+
+prevBtn.addEventListener("click", () => {
+  if (!state.clips.length) return;
+  state.index = (state.index - 1 + state.clips.length) % state.clips.length;
+  playCurrent();
+});
+
+nextBtn.addEventListener("click", () => {
+  if (!state.clips.length) return;
+  state.index = (state.index + 1) % state.clips.length;
+  playCurrent();
+});
+
+hiddenAudio.addEventListener("ended", () => {
+  if (state.clips.length > 1) {
+    state.index = (state.index + 1) % state.clips.length;
+    playCurrent();
+  } else {
+    state.playing = false;
+    playBtn.textContent = "Play";
+    updateTrackLabel();
+  }
+});
+hiddenVideo.addEventListener("ended", () => {
+  if (state.clips.length > 1) {
+    state.index = (state.index + 1) % state.clips.length;
+    playCurrent();
+  } else {
+    state.playing = false;
+    playBtn.textContent = "Play";
+    updateTrackLabel();
+  }
+});
+
+async function listMics() {
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const mics = devices.filter((d) => d.kind === "audioinput");
+    const current = audioDeviceSel.value;
+    audioDeviceSel.innerHTML = `<option value="">🎤 Default Mic</option>`;
+    mics.forEach((d) => {
+      const opt = document.createElement("option");
+      opt.value = d.deviceId;
+      opt.textContent = d.label || "Microfon";
+      audioDeviceSel.appendChild(opt);
+    });
+    if (current) audioDeviceSel.value = current;
+  } catch {}
+}
+listMics();
+navigator.mediaDevices?.addEventListener?.("devicechange", listMics);
+
+micListenBtn.addEventListener("click", async () => {
+  await ensureAudio();
+  if (state.micOn) {
+    state.micSource?.disconnect();
+    state.micStream?.getTracks().forEach((t) => t.stop());
+    state.micOn = false;
+    micListenBtn.classList.remove("active");
+    micListenBtn.textContent = "🎤 Listen Mic";
+    updateTrackLabel();
+    return;
+  }
+  try {
+    const constraints = {
+      audio: audioDeviceSel.value ? { deviceId: { exact: audioDeviceSel.value } } : true,
+      video: false,
+    };
+    state.micStream = await navigator.mediaDevices.getUserMedia(constraints);
+    state.micSource = state.audioCtx.createMediaStreamSource(state.micStream);
+    state.micSource.connect(state.analyser);
+    state.micOn = true;
+    micListenBtn.classList.add("active");
+    micListenBtn.textContent = "🎤 Mic ON";
+    updateTrackLabel();
+    listMics();
+  } catch (e) {
+    toastMsg("Microfon indisponibil");
+  }
+});
+
+function canvasStream() {
+  return canvas.captureStream(30);
+}
+
+function mixAudioForRecord() {
+  if (!state.audioCtx) return canvasStream();
+  const dest = state.audioCtx.createMediaStreamDestination();
+  try { state.analyser.connect(dest); } catch {}
+  const mixed = new MediaStream([
+    ...canvasStream().getVideoTracks(),
+    ...dest.stream.getAudioTracks(),
+  ]);
+  return mixed;
+}
+
+function startRecord() {
+  if (state.recording) return;
+  const stream = mixAudioForRecord();
+  const mime = MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")
+    ? "video/webm;codecs=vp9,opus"
+    : MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus")
+      ? "video/webm;codecs=vp8,opus"
+      : "video/webm";
+  state.chunks = [];
+  state.recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 6_000_000 });
+  state.recorder.ondataavailable = (e) => { if (e.data.size) state.chunks.push(e.data); };
+  state.recorder.onstop = () => {
+    const blob = new Blob(state.chunks, { type: "video/webm" });
+    if (state.lastExportUrl) URL.revokeObjectURL(state.lastExportUrl);
+    state.lastExportUrl = URL.createObjectURL(blob);
+    toastMsg("Înregistrare gata — apasă Export Video");
+  };
+  state.recorder.start(200);
+  state.recording = true;
+  recordBtn.classList.add("active", "danger");
+  recordBtn.textContent = "Recording…";
+}
+
+function stopRecord() {
+  if (!state.recording) return;
+  state.recorder.stop();
+  state.recording = false;
+  recordBtn.classList.remove("active", "danger");
+  recordBtn.textContent = "Record";
+}
+
+recordBtn.addEventListener("click", () => {
+  if (state.recording) stopRecord();
+  else startRecord();
+});
+
+exportBtn.addEventListener("click", () => {
+  if (!state.lastExportUrl) {
+    if (!state.recording) {
+      toastMsg("Pornește Record, apoi oprește și exportă");
     } else {
-      this.ctx.fillStyle = bg.color1 || '#000000';
+      toastMsg("Oprește înregistrarea întâi");
     }
-    this.ctx.fillRect(0, 0, w, h);
+    return;
+  }
+  const a = document.createElement("a");
+  a.href = state.lastExportUrl;
+  a.download = "visualizer.webm";
+  a.click();
+});
 
-    // Imagine de fundal defilabilă (Scrolling)
-    if (this.scrollingImage && this.scrollingImage.complete) {
-      this.scrollX += dt * 40;
-      if (this.scrollX > this.scrollingImage.width) this.scrollX = 0;
-      this.ctx.save();
-      this.ctx.globalAlpha = 0.3;
-      for (let x = -this.scrollX; x < w; x += this.scrollingImage.width) {
-        this.ctx.drawImage(this.scrollingImage, x, 0, this.scrollingImage.width, h);
-      }
-      this.ctx.restore();
+toggleUiBtn.addEventListener("click", () => {
+  state.uiHidden = !state.uiHidden;
+  $("ui").classList.toggle("hidden-ui", state.uiHidden);
+  toggleUiBtn.textContent = state.uiHidden ? "☰ Comenzi" : "✕ Ascunde comenzi";
+});
+
+async function toggleFullscreen() {
+  try {
+    if (!document.fullscreenElement) {
+      await document.documentElement.requestFullscreen();
+      fullscreenBtn.classList.add("active");
+    } else {
+      await document.exitFullscreen();
+      fullscreenBtn.classList.remove("active");
     }
+  } catch (e) {
+    toastMsg("Fullscreen indisponibil");
+  }
+}
+fullscreenBtn.addEventListener("click", toggleFullscreen);
+document.addEventListener("fullscreenchange", () => {
+  fullscreenBtn.classList.toggle("active", !!document.fullscreenElement);
+});
 
-    // Efectele audio principale (Bars, Radial, Waveform)
-    this.ctx.save();
-    const mode = this.options.mode;
-    const intensity = this.options.intensity || 1.5;
-    this.ctx.strokeStyle = this.options.color || '#ffffff';
-    this.ctx.fillStyle = this.options.color || '#ffffff';
-    this.ctx.lineWidth = 3;
+document.addEventListener("keydown", (e) => {
+  if (e.target.matches("input, textarea")) return;
+  if (e.code === "Space") { e.preventDefault(); playBtn.click(); }
+  if (e.key === "f" || e.key === "F") toggleFullscreen();
+  if (e.key === "h" || e.key === "H") toggleUiBtn.click();
+  if (e.key === "ArrowRight") nextBtn.click();
+  if (e.key === "ArrowLeft") prevBtn.click();
+});
 
-    if (mode === 'radial' || mode === 'radialwave') {
-      // Mod Radial (Cerc reactiv)
-      const centerX = w / 2, centerY = h / 2;
-      let sum = 0; for(let i=0; i<100; i++) sum += this.dataArray[i];
-      const avg = sum / 100;
-      const baseRadius = Math.min(w, h) * 0.15 + (avg * intensity * 0.2);
-      
-      this.ctx.beginPath();
-      for (let i = 0; i < 120; i++) {
+function bassEnergy(freq) {
+  let s = 0;
+  const n = Math.min(24, freq.length);
+  for (let i = 0; i < n; i++) s += freq[i];
+  return s / (n * 255);
+}
+
+function midEnergy(freq) {
+  let s = 0;
+  const a = 24, b = Math.min(120, freq.length);
+  for (let i = a; i < b; i++) s += freq[i];
+  return s / ((b - a) * 255);
+}
+
+function hexToRgb(hex) {
+  const n = hex.replace("#", "");
+  return {
+    r: parseInt(n.slice(0, 2), 16),
+    g: parseInt(n.slice(2, 4), 16),
+    b: parseInt(n.slice(4, 6), 16),
+  };
+}
+
+function coverDraw(source, w, h, alpha = 1) {
+  if (!source) return;
+  const sw = source.videoWidth || source.naturalWidth || source.width;
+  const sh = source.videoHeight || source.naturalHeight || source.height;
+  if (!sw || !sh) return;
+  const scale = Math.max(w / sw, h / sh);
+  const dw = sw * scale;
+  const dh = sh * scale;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.drawImage(source, (w - dw) / 2, (h - dh) / 2, dw, dh);
+  ctx.restore();
+}
+
+function containDraw(source, cx, cy, size, alpha = 1) {
+  if (!source) return;
+  const sw = source.videoWidth || source.naturalWidth || source.width;
+  const sh = source.videoHeight || source.naturalHeight || source.height;
+  if (!sw || !sh) return;
+  const scale = Math.min(size / sw, size / sh);
+  const dw = sw * scale;
+  const dh = sh * scale;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.drawImage(source, cx - dw / 2, cy - dh / 2, dw, dh);
+  ctx.restore();
+}
+
+function drawBackground(w, h, beat) {
+  if (state.cameraOn && cameraVideo.readyState >= 2) {
+    coverDraw(cameraVideo, w, h, 1);
+    ctx.fillStyle = `rgba(0,0,0,${0.22 + beat * 0.08})`;
+    ctx.fillRect(0, 0, w, h);
+    return;
+  }
+
+  if (bgTypeEl.value === "gradient") {
+    const g = ctx.createLinearGradient(0, 0, w, h);
+    g.addColorStop(0, bg1El.value);
+    g.addColorStop(1, bg2El.value);
+    ctx.fillStyle = g;
+  } else {
+    ctx.fillStyle = bg1El.value;
+  }
+  ctx.fillRect(0, 0, w, h);
+
+  if (state.videoFileOn && overlayVideo.readyState >= 2) {
+    coverDraw(overlayVideo, w, h, 0.55);
+  }
+  if (state.suggestionOn && state.suggestionImg) {
+    coverDraw(state.suggestionImg, w, h, 0.28);
+  }
+}
+
+function drawScroll(w, h, beat) {
+  if (!state.scrollOn || !scrollImg.complete || !scrollImg.naturalWidth) return;
+  const ih = Math.max(90, Math.min(180, h * 0.16));
+  const scale = ih / scrollImg.naturalHeight;
+  const iw = scrollImg.naturalWidth * scale;
+  state.scrollX -= 1.4 + beat * 8;
+  if (state.scrollX < -iw) state.scrollX += iw;
+  ctx.save();
+  ctx.globalAlpha = 0.72;
+  for (let x = state.scrollX % iw - iw; x < w + iw; x += iw) {
+    ctx.drawImage(scrollImg, x, h - ih - 84, iw, ih);
+  }
+  ctx.restore();
+}
+
+function drawPng(w, h, beat, mid = 0) {
+  if (!state.pngOn || !pngImage.complete || !pngImage.naturalWidth) return;
+
+  const gravity = 2200;
+  const floor = 0;
+  const kick = Math.max(0, beat - 0.28) * 920 + mid * 180;
+  if (beat > 0.42 && beat - state.pngLastBeat > 0.06) {
+    state.pngV = -Math.max(280, kick);
+    state.pngSquash = 0.82;
+  }
+  state.pngLastBeat = beat;
+
+  const dt = 1 / 60;
+  state.pngV += gravity * dt;
+  state.pngY += state.pngV * dt;
+
+  if (state.pngY >= floor) {
+    state.pngY = floor;
+    if (state.pngV > 80) {
+      state.pngV *= -0.38;
+      state.pngSquash = Math.max(0.72, 1 - state.pngV * 0.0012);
+    } else {
+      state.pngV = 0;
+      state.pngSquash += (1 - state.pngSquash) * 0.18;
         const angle = (i / 120) * Math.PI * 2;
         const v = this.dataArray[i % this.bufferLength] * intensity * 0.4;
         const r = baseRadius + v;
