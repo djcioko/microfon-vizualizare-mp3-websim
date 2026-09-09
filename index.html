@@ -1,12 +1,12 @@
 <!doctype html>
-<html lang="en">
+<html lang="ro">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Custom Song Visualizer</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
@@ -23,6 +23,14 @@
       <label class="button">
         + Scrolling Image
         <input id="scroll-image" type="file" accept="image/*" hidden>
+      </label>
+      <label class="button">
+        + PNG Overlay
+        <input id="png-input" type="file" accept="image/png,image/*" hidden>
+      </label>
+      <label class="button">
+        + Video File
+        <input id="video-file-input" type="file" accept="video/*" hidden>
       </label>
       <button id="add-suggestion">Add Suggestion Image</button>
       <button id="prev">Prev</button>
@@ -42,11 +50,16 @@
       </label>
       <button id="apply-text">Add Text</button>
 
-      <select id="mode">
+      <select id="mode" title="Efect vizual">
         <option value="bars">Bars</option>
         <option value="radial">Radial</option>
         <option value="wave">Waveform</option>
         <option value="radialwave">Radial + Waveform</option>
+        <option value="particles">Particles</option>
+        <option value="spiral">Spiral</option>
+        <option value="rings">Rings</option>
+        <option value="mirror">Mirror Bars</option>
+        <option value="aurora">Aurora</option>
       </select>
       <label class="inline">
         Intensity
@@ -71,13 +84,52 @@
       </label>
     </div>
 
-    <div id="current-track-display" style="font-size: 13px; font-weight: 600; color: #4EF05D; padding: 4px 2px;">
+    <div class="toggles">
+      <button id="toggle-png" class="toggle-btn" title="PNG overlay on/off">
+        <span class="dot"></span> PNG Overlay
+      </button>
+      <button id="toggle-video" class="toggle-btn" title="Video file on/off">
+        <span class="dot"></span> Video File
+      </button>
+      <button id="toggle-camera" class="toggle-btn danger" title="Camera device on/off fullscreen">
+        <span class="dot"></span> Camera
+      </button>
+      <button id="toggle-center" class="toggle-btn" title="Center media on/off">
+        <span class="dot"></span> Center
+      </button>
+      <button id="toggle-scroll" class="toggle-btn" title="Scrolling image on/off">
+        <span class="dot"></span> Scroll
+      </button>
+      <button id="toggle-suggest" class="toggle-btn" title="Suggestion image on/off">
+        <span class="dot"></span> Suggestion
+      </button>
+    </div>
+
+    <div id="current-track-display">
       Sursă: Nicio piesă încărcată
     </div>
 
     <ul id="clip-list"></ul>
   </div>
+
+  <div id="dock">
+    <button id="toggle-ui" title="Ascunde / arată comenzile (H)">✕ Ascunde comenzi</button>
+    <button id="fullscreen-btn" title="Fullscreen (F)">⛶</button>
+  </div>
+
+  <div id="status-toast"></div>
+
+  <div id="hidden-media">
+    <audio id="hidden-audio" crossorigin="anonymous" playsinline></audio>
+    <video id="hidden-video" crossorigin="anonymous" playsinline></video>
+    <video id="overlay-video" crossorigin="anonymous" playsinline muted loop></video>
+    <video id="camera-video" playsinline muted autoplay></video>
+    <img id="center-media" alt="">
+    <img id="png-image" alt="">
+    <img id="scroll-img" alt="">
+  </div>
+
   <canvas id="canvas"></canvas>
-  <script type="module" src="./app.js"></script>
+  <script src="./app.js"></script>
 </body>
 </html>
