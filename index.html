@@ -1,135 +1,66 @@
-<!doctype html>
-<html lang="ro">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Custom Song Visualizer</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./styles.css" />
-</head>
-<body>
-  <div id="ui">
-    <div class="controls">
-      <label class="button">
-        + Add Clip
-        <input id="file-input" type="file" accept="audio/*,video/*" multiple hidden>
-      </label>
-      <label class="button">
-        + Center Media
-        <input id="image-input" type="file" accept="image/*,video/*" hidden>
-      </label>
-      <label class="button">
-        + Scrolling Image
-        <input id="scroll-image" type="file" accept="image/*" hidden>
-      </label>
-      <label class="button">
-        + PNG Overlay
-        <input id="png-input" type="file" accept="image/png,image/*" hidden>
-      </label>
-      <label class="button">
-        + Video File
-        <input id="video-file-input" type="file" accept="video/*" hidden>
-      </label>
-      <button id="add-suggestion">Add Suggestion Image</button>
-      <button id="prev">Prev</button>
-      <button id="playpause">Play</button>
-      <button id="stop">Stop</button>
-      <button id="record">Record</button>
-      <button id="export">Export Video</button>
-      <button id="next">Next</button>
+// ── MICROFOANE ──
+async function refreshMicList() {
+  try {
+    // Cere permisiune (necesar ca să apară etichetele)
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    stream.getTracks().forEach(t => t.stop()); // oprim imediat, doar am vrut permisiunea
 
-      <select id="audio-device" title="Audio Input Device">
-        <option value="">🎤 Default Mic</option>
-      </select>
-      <button id="mic-listen">🎤 Listen Mic</button>
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const mics = devices.filter(d => d.kind === "audioinput");
 
-      <label class="inline">
-        <input id="overlay-text" type="text" placeholder="Overlay text..." maxlength="80">
-      </label>
-      <button id="apply-text">Add Text</button>
+    const current = audioDeviceSel.value;
+    audioDeviceSel.innerHTML = `<option value="">🎤 Default Mic</option>`;
 
-      <select id="mode" title="Efect vizual">
-        <option value="bars">Bars</option>
-        <option value="radial">Radial</option>
-        <option value="wave">Waveform</option>
-        <option value="radialwave">Radial + Waveform</option>
-        <option value="particles">Particles</option>
-        <option value="spiral">Spiral</option>
-        <option value="rings">Rings</option>
-        <option value="mirror">Mirror Bars</option>
-        <option value="aurora">Aurora</option>
-      </select>
-      <label class="inline">
-        Intensity
-        <input id="intensity" type="range" min="0.5" max="3" step="0.1" value="1.5">
-      </label>
-      <label class="inline">
-        Color
-        <input id="viz-color" type="color" value="#ffffff">
-      </label>
-      <label class="inline">
-        <input id="strobe" type="checkbox" checked> Strobe
-      </label>
-      <select id="bg-type">
-        <option value="solid">Solid</option>
-        <option value="gradient">Gradient</option>
-      </select>
-      <label class="inline" id="bg-color1-wrap">
-        BG Color 1 <input id="bg-color1" type="color" value="#000000">
-      </label>
-      <label class="inline" id="bg-color2-wrap">
-        BG Color 2 <input id="bg-color2" type="color" value="#202020">
-      </label>
-    </div>
+    mics.forEach((d, i) => {
+      const opt = document.createElement("option");
+      opt.value = d.deviceId;
+      opt.textContent = d.label || `Microfon ${i + 1}`;
+      audioDeviceSel.appendChild(opt);
+    });
 
-    <div class="toggles">
-      <button id="toggle-png" class="toggle-btn" title="PNG overlay on/off">
-        <span class="dot"></span> PNG Overlay
-      </button>
-      <button id="toggle-video" class="toggle-btn" title="Video file on/off">
-        <span class="dot"></span> Video File
-      </button>
-      <button id="toggle-camera" class="toggle-btn danger" title="Camera device on/off fullscreen">
-        <span class="dot"></span> Camera
-      </button>
-      <button id="toggle-center" class="toggle-btn" title="Center media on/off">
-        <span class="dot"></span> Center
-      </button>
-      <button id="toggle-scroll" class="toggle-btn" title="Scrolling image on/off">
-        <span class="dot"></span> Scroll
-      </button>
-      <button id="toggle-suggest" class="toggle-btn" title="Suggestion image on/off">
-        <span class="dot"></span> Suggestion
-      </button>
-    </div>
+    if (current) audioDeviceSel.value = current;
+    toastMsg(mics.length ? `${mics.length} microfoane găsite` : "Niciun microfon găsit");
+  } catch (err) {
+    console.warn(err);
+    toastMsg("Permisiune microfon refuzată sau indisponibil");
+  }
+}
 
-    <div id="current-track-display">
-      Sursă: Nicio piesă încărcată
-    </div>
+// Populează lista când utilizatorul interacționează
+micListenBtn.addEventListener("click", async () => {
+  await ensureAudio();
+  if (state.micOn) {
+    // oprește microfonul (codul tău existent)
+    state.micSource?.disconnect();
+    state.micStream?.getTracks().forEach(t => t.stop());
+    state.micOn = false;
+    micListenBtn.classList.remove("active");
+    micListenBtn.textContent = "🎤 Listen Mic";
+    updateTrackLabel();
+    return;
+  }
 
-    <ul id="clip-list"></ul>
-  </div>
+  // Înainte de a porni, reîmprospătează lista (cere permisiune dacă e nevoie)
+  await refreshMicList();
 
-  <div id="dock">
-    <button id="toggle-ui" title="Ascunde / arată comenzile (H)">✕ Ascunde comenzi</button>
-    <button id="fullscreen-btn" title="Fullscreen (F)">⛶</button>
-  </div>
+  try {
+    const constraints = {
+      audio: audioDeviceSel.value
+        ? { deviceId: { exact: audioDeviceSel.value } }
+        : true,
+      video: false
+    };
+    state.micStream = await navigator.mediaDevices.getUserMedia(constraints);
+    state.micSource = state.audioCtx.createMediaStreamSource(state.micStream);
+    state.micSource.connect(state.analyser);
+    state.micOn = true;
+    micListenBtn.classList.add("active");
+    micListenBtn.textContent = "🎤 Mic ON";
+    updateTrackLabel();
+  } catch (e) {
+    toastMsg("Microfon indisponibil: " + e.message);
+  }
+});
 
-  <div id="status-toast"></div>
-
-  <div id="hidden-media">
-    <audio id="hidden-audio" crossorigin="anonymous" playsinline></audio>
-    <video id="hidden-video" crossorigin="anonymous" playsinline></video>
-    <video id="overlay-video" crossorigin="anonymous" playsinline muted loop></video>
-    <video id="camera-video" playsinline muted autoplay></video>
-    <img id="center-media" alt="">
-    <img id="png-image" alt="">
-    <img id="scroll-img" alt="">
-  </div>
-
-  <canvas id="canvas"></canvas>
-  <script src="./app.js"></script>
-</body>
-</html>
+// Opțional: reîmprospătează lista și când se schimbă dispozitivele
+navigator.mediaDevices?.addEventListener?.("devicechange", refreshMicList);
