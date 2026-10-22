@@ -22,10 +22,11 @@ let cameraOn = false, cameraStream = null;
 let videoFileOn = false;
 let recorder = null, chunks = [], recording = false;
 let scrollX = 0;
+let vinylAngle = 0;
 
-// Free form positions (drag with mouse)
+// Free form + scale
 let pngPos = { x: 0.5, y: 0.5, scale: 1 };
-let textPos = { x: 0.5, y: 0.85 };
+let textPos = { x: 0.5, y: 0.85, scale: 1 };
 let centerPos = { x: 0.5, y: 0.5, scale: 1 };
 let dragging = null;
 let dragOffset = { x: 0, y: 0 };
@@ -49,7 +50,7 @@ function spawnParticles(n = 3) {
 function toastMsg(msg) {
   toast.textContent = msg;
   toast.classList.add("show");
-  setTimeout(() => toast.classList.remove("show"), 1800);
+  setTimeout(() => toast.classList.remove("show"), 1600);
 }
 
 function resize() {
@@ -63,24 +64,19 @@ function resize() {
 resize();
 window.addEventListener("resize", resize);
 
-// Mouse free-form drag
+// Mouse drag
 canvas.addEventListener("mousedown", e => {
   const rect = canvas.getBoundingClientRect();
   const mx = (e.clientX - rect.left) / rect.width;
   const my = (e.clientY - rect.top) / rect.height;
 
-  // Check PNG
-  if (pngOn && Math.abs(mx - pngPos.x) < 0.15 && Math.abs(my - pngPos.y) < 0.15) {
+  if (pngOn && Math.abs(mx - pngPos.x) < 0.18 && Math.abs(my - pngPos.y) < 0.18) {
     dragging = "png";
     dragOffset = { x: mx - pngPos.x, y: my - pngPos.y };
-  }
-  // Check Text
-  else if (overlayText && Math.abs(mx - textPos.x) < 0.2 && Math.abs(my - textPos.y) < 0.08) {
+  } else if (overlayText && Math.abs(mx - textPos.x) < 0.25 && Math.abs(my - textPos.y) < 0.1) {
     dragging = "text";
     dragOffset = { x: mx - textPos.x, y: my - textPos.y };
-  }
-  // Check Center
-  else if (centerOn && centerMedia && Math.abs(mx - centerPos.x) < 0.15 && Math.abs(my - centerPos.y) < 0.15) {
+  } else if (centerOn && centerMedia && Math.abs(mx - centerPos.x) < 0.18 && Math.abs(my - centerPos.y) < 0.18) {
     dragging = "center";
     dragOffset = { x: mx - centerPos.x, y: my - centerPos.y };
   }
@@ -91,12 +87,28 @@ window.addEventListener("mousemove", e => {
   const rect = canvas.getBoundingClientRect();
   const mx = (e.clientX - rect.left) / rect.width;
   const my = (e.clientY - rect.top) / rect.height;
-  if (dragging === "png") { pngPos.x = mx - dragOffset.x; pngPos.y = my - dragOffset.y; }
-  if (dragging === "text") { textPos.x = mx - dragOffset.x; textPos.y = my - dragOffset.y; }
-  if (dragging === "center") { centerPos.x = mx - dragOffset.x; centerPos.y = my - dragOffset.y; }
+  if (dragging === "png") { pngPos.x = Math.max(0.05, Math.min(0.95, mx - dragOffset.x)); pngPos.y = Math.max(0.05, Math.min(0.95, my - dragOffset.y)); }
+  if (dragging === "text") { textPos.x = Math.max(0.05, Math.min(0.95, mx - dragOffset.x)); textPos.y = Math.max(0.05, Math.min(0.95, my - dragOffset.y)); }
+  if (dragging === "center") { centerPos.x = Math.max(0.05, Math.min(0.95, mx - dragOffset.x)); centerPos.y = Math.max(0.05, Math.min(0.95, my - dragOffset.y)); }
 });
-
 window.addEventListener("mouseup", () => dragging = null);
+
+// Scalare cu roata mouse-ului
+canvas.addEventListener("wheel", e => {
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  const mx = (e.clientX - rect.left) / rect.width;
+  const my = (e.clientY - rect.top) / rect.height;
+  const delta = e.deltaY > 0 ? 0.92 : 1.08;
+
+  if (pngOn && Math.abs(mx - pngPos.x) < 0.2 && Math.abs(my - pngPos.y) < 0.2) {
+    pngPos.scale = Math.max(0.3, Math.min(3, pngPos.scale * delta));
+  } else if (centerOn && centerMedia && Math.abs(mx - centerPos.x) < 0.2 && Math.abs(my - centerPos.y) < 0.2) {
+    centerPos.scale = Math.max(0.3, Math.min(3, centerPos.scale * delta));
+  } else if (overlayText && Math.abs(mx - textPos.x) < 0.25 && Math.abs(my - textPos.y) < 0.12) {
+    textPos.scale = Math.max(0.4, Math.min(3, textPos.scale * delta));
+  }
+}, { passive: false });
 
 async function ensureAudio() {
   if (!audioCtx) {
@@ -124,11 +136,10 @@ async function refreshMicList() {
       audioDeviceSel.appendChild(opt);
     });
     if (current) audioDeviceSel.value = current;
-    toastMsg(mics.length ? `${mics.length} microfoane` : "Niciun microfon");
   } catch (e) { toastMsg("Permisiune microfon refuzată"); }
 }
 
-// Clips (neschimbat)
+// Clips
 $("file-input").addEventListener("change", e => {
   [...e.target.files].forEach(file => {
     const url = URL.createObjectURL(file);
@@ -177,7 +188,7 @@ $("stop").addEventListener("click", () => {
 $("prev").addEventListener("click", () => { if (clips.length) { index = (index - 1 + clips.length) % clips.length; playCurrent(); } });
 $("next").addEventListener("click", () => { if (clips.length) { index = (index + 1) % clips.length; playCurrent(); } });
 
-// Mic (neschimbat)
+// Mic
 micListenBtn.addEventListener("click", async () => {
   await ensureAudio();
   if (micOn) {
@@ -202,7 +213,7 @@ micListenBtn.addEventListener("click", async () => {
   } catch (e) { toastMsg("Microfon indisponibil"); }
 });
 
-// Media overlays (se activează automat)
+// Media
 $("image-input").addEventListener("change", e => {
   const f = e.target.files[0]; if (!f) return;
   const img = new Image();
@@ -211,7 +222,7 @@ $("image-input").addEventListener("change", e => {
 });
 $("png-input").addEventListener("change", e => {
   const f = e.target.files[0]; if (!f) return;
-  pngImage.onload = () => { pngOn = true; $("toggle-png").classList.add("active"); toastMsg("PNG activat"); };
+  pngImage.onload = () => { pngOn = true; $("toggle-png").classList.add("active"); toastMsg("PNG activat — trage + roata mouse"); };
   pngImage.src = URL.createObjectURL(f); e.target.value = "";
 });
 $("scroll-image").addEventListener("change", e => {
@@ -235,7 +246,7 @@ $("add-suggestion").addEventListener("click", () => {
 });
 $("apply-text").addEventListener("click", () => {
   overlayText = $("overlay-text").value.trim();
-  if (overlayText) toastMsg("Text adăugat (trage cu mouse-ul)");
+  if (overlayText) toastMsg("Text adăugat — trage + roata mouse");
 });
 
 // Toggles
@@ -295,7 +306,7 @@ $("toggle-ui").onclick = () => {
   $("toggle-ui").textContent = document.body.classList.contains("ui-hidden") ? "👁 Arată comenzi" : "✕ Ascunde comenzi";
 };
 
-// LOOP cu pulse + free form + efecte complete
+// LOOP
 function loop() {
   requestAnimationFrame(loop);
   const w = canvas.width / (window.devicePixelRatio || 1);
@@ -392,10 +403,38 @@ function loop() {
         ctx.stroke();
       }
       ctx.globalAlpha = 1;
+    } else if (mode === "vinyl") {
+      vinylAngle += 0.04 + bass * 0.08;
+      const cx = w / 2, cy = h / 2;
+      const r = Math.min(w, h) * 0.35;
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(vinylAngle);
+      // Disc
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.fillStyle = "#111";
+      ctx.fill();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      // Groove lines
+      for (let i = 1; i < 8; i++) {
+        ctx.beginPath();
+        ctx.arc(0, 0, r * (i / 8), 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(255,255,255,${0.15 + bass * 0.3})`;
+        ctx.stroke();
+      }
+      // Center label
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 0.22, 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.fill();
+      ctx.restore();
     }
   }
 
-  // Update particles
+  // Particles
   particles = particles.filter(p => p.life > 0);
   particles.forEach(p => {
     p.x += p.vx; p.y += p.vy; p.vy += 0.05; p.life -= 0.012;
@@ -407,21 +446,21 @@ function loop() {
     ctx.globalAlpha = 1;
   });
 
-  // PNG cu pulse / jump
+  // PNG cu pulse + scale + free form
   if (pngOn && pngImage.complete && pngImage.width) {
     const pulse = 1 + bass * 0.35;
     const size = Math.min(w, h) * 0.32 * pulse * pngPos.scale;
     const px = pngPos.x * w - size / 2;
-    const py = pngPos.y * h - size / 2 - bass * 30; // jump
+    const py = pngPos.y * h - size / 2 - bass * 28;
     ctx.drawImage(pngImage, px, py, size, size);
   }
 
-  // Center cu pulse
+  // Center
   if (centerOn && centerMedia) {
     const pulse = 1 + bass * 0.25;
     const size = Math.min(w, h) * 0.28 * pulse * centerPos.scale;
     const cx = centerPos.x * w;
-    const cy = centerPos.y * h - bass * 20;
+    const cy = centerPos.y * h - bass * 18;
     ctx.save();
     ctx.beginPath();
     ctx.arc(cx, cy, size / 2, 0, Math.PI * 2);
@@ -430,20 +469,18 @@ function loop() {
     ctx.restore();
   }
 
-  if (suggestionOn && suggestionImg) {
-    ctx.drawImage(suggestionImg, w - 190, 30, 150, 150);
-  }
+  if (suggestionOn && suggestionImg) ctx.drawImage(suggestionImg, w - 190, 30, 150, 150);
 
-  // Text cu pulse / jump + free form
+  // Text cu pulse + scale + free form
   if (overlayText) {
     const pulse = 1 + bass * 0.4;
     ctx.save();
     ctx.fillStyle = "#fff";
-    ctx.font = `bold ${42 * pulse}px sans-serif`;
+    ctx.font = `bold ${42 * pulse * textPos.scale}px sans-serif`;
     ctx.textAlign = "center";
     ctx.shadowColor = "#000";
     ctx.shadowBlur = 10;
-    ctx.fillText(overlayText, textPos.x * w, textPos.y * h - bass * 25);
+    ctx.fillText(overlayText, textPos.x * w, textPos.y * h - bass * 22);
     ctx.restore();
   }
 }
