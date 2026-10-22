@@ -7,6 +7,10 @@ const micListenBtn = $("mic-listen");
 const trackDisplay = $("current-track-display");
 const toast = $("status-toast");
 const hiddenAudio = $("hidden-audio");
+const overlayVideo = $("overlay-video");
+const cameraVideo = $("camera-video");
+const pngImage = $("png-image");
+const scrollImg = $("scroll-img");
 
 let audioCtx, analyser, sourceNode;
 let clips = [], index = 0, playing = false;
@@ -16,12 +20,14 @@ let centerMedia = null, centerOn = true;
 let pngOn = false, scrollOn = false, suggestionOn = false, suggestionImg = null;
 let cameraOn = false, cameraStream = null;
 let videoFileOn = false;
-let recorder = null, chunks = [];
+let recorder = null, chunks = [], recording = false;
+let scrollX = 0;
+let particles = [];
 
 function toastMsg(msg) {
   toast.textContent = msg;
   toast.classList.add("show");
-  setTimeout(() => toast.classList.remove("show"), 1600);
+  setTimeout(() => toast.classList.remove("show"), 1800);
 }
 
 function resize() {
@@ -67,7 +73,7 @@ async function refreshMicList() {
   }
 }
 
-// Files
+// Clips
 $("file-input").addEventListener("change", e => {
   [...e.target.files].forEach(file => {
     const url = URL.createObjectURL(file);
@@ -75,7 +81,6 @@ $("file-input").addEventListener("change", e => {
   });
   renderList();
   e.target.value = "";
-  if (clips.length && !playing) { index = clips.length - 1; }
 });
 
 function renderList() {
@@ -108,30 +113,14 @@ async function playCurrent() {
 }
 
 playBtn.addEventListener("click", () => {
-  if (playing) {
-    hiddenAudio.pause();
-    playing = false;
-    playBtn.textContent = "Play";
-  } else playCurrent();
+  if (playing) { hiddenAudio.pause(); playing = false; playBtn.textContent = "Play"; }
+  else playCurrent();
 });
-
 $("stop").addEventListener("click", () => {
-  hiddenAudio.pause();
-  hiddenAudio.currentTime = 0;
-  playing = false;
-  playBtn.textContent = "Play";
+  hiddenAudio.pause(); hiddenAudio.currentTime = 0; playing = false; playBtn.textContent = "Play";
 });
-
-$("prev").addEventListener("click", () => {
-  if (!clips.length) return;
-  index = (index - 1 + clips.length) % clips.length;
-  playCurrent();
-});
-$("next").addEventListener("click", () => {
-  if (!clips.length) return;
-  index = (index + 1) % clips.length;
-  playCurrent();
-});
+$("prev").addEventListener("click", () => { if (clips.length) { index = (index - 1 + clips.length) % clips.length; playCurrent(); } });
+$("next").addEventListener("click", () => { if (clips.length) { index = (index + 1) % clips.length; playCurrent(); } });
 
 // Mic
 micListenBtn.addEventListener("click", async () => {
@@ -155,89 +144,125 @@ micListenBtn.addEventListener("click", async () => {
     micListenBtn.classList.add("active");
     micListenBtn.textContent = "🎤 Mic ON";
     trackDisplay.textContent = "Sursă: Microfon";
-  } catch (e) {
-    toastMsg("Microfon indisponibil");
-  }
+  } catch (e) { toastMsg("Microfon indisponibil"); }
 });
 
-// Overlays simple
+// Media overlays
 $("image-input").addEventListener("change", e => {
-  const f = e.target.files[0];
-  if (!f) return;
+  const f = e.target.files[0]; if (!f) return;
   const img = new Image();
-  img.onload = () => { centerMedia = img; centerOn = true; $("toggle-center").classList.add("active"); toastMsg("Center media ON"); };
-  img.src = URL.createObjectURL(f);
-  e.target.value = "";
+  img.onload = () => { centerMedia = img; centerOn = true; $("toggle-center").classList.add("active"); toastMsg("Center ON"); };
+  img.src = URL.createObjectURL(f); e.target.value = "";
 });
-
 $("png-input").addEventListener("change", e => {
-  const f = e.target.files[0];
-  if (!f) return;
-  $("png-image").onload = () => { pngOn = true; $("toggle-png").classList.add("active"); toastMsg("PNG ON"); };
-  $("png-image").src = URL.createObjectURL(f);
-  e.target.value = "";
+  const f = e.target.files[0]; if (!f) return;
+  pngImage.onload = () => { pngOn = true; $("toggle-png").classList.add("active"); toastMsg("PNG ON"); };
+  pngImage.src = URL.createObjectURL(f); e.target.value = "";
 });
-
 $("scroll-image").addEventListener("change", e => {
-  const f = e.target.files[0];
-  if (!f) return;
-  $("scroll-img").onload = () => { scrollOn = true; $("toggle-scroll").classList.add("active"); toastMsg("Scroll ON"); };
-  $("scroll-img").src = URL.createObjectURL(f);
+  const f = e.target.files[0]; if (!f) return;
+  scrollImg.onload = () => { scrollOn = true; $("toggle-scroll").classList.add("active"); toastMsg("Scroll ON"); };
+  scrollImg.src = URL.createObjectURL(f); e.target.value = "";
+});
+$("video-file-input").addEventListener("change", e => {
+  const f = e.target.files[0]; if (!f) return;
+  overlayVideo.src = URL.createObjectURL(f);
+  overlayVideo.play().catch(() => {});
+  videoFileOn = true;
+  $("toggle-video").classList.add("active");
+  toastMsg("Video overlay ON");
   e.target.value = "";
 });
-
 $("add-suggestion").addEventListener("click", () => {
   const img = new Image();
   img.onload = () => { suggestionImg = img; suggestionOn = true; $("toggle-suggest").classList.add("active"); toastMsg("Suggestion ON"); };
   img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400"><circle cx="200" cy="200" r="150" fill="#4ef05d"/><text x="200" y="220" text-anchor="middle" font-size="60" fill="#000">VIZ</text></svg>`);
 });
-
 $("apply-text").addEventListener("click", () => {
   overlayText = $("overlay-text").value.trim();
   if (overlayText) toastMsg("Text adăugat");
 });
 
 // Toggles
-["png","video","camera","center","scroll","suggest"].forEach(name => {
-  $(`toggle-${name}`).addEventListener("click", () => {
-    const key = name === "suggest" ? "suggestionOn" : name === "png" ? "pngOn" : name === "scroll" ? "scrollOn" : name === "center" ? "centerOn" : name === "video" ? "videoFileOn" : "cameraOn";
-    if (name === "camera") {
-      if (cameraOn) {
-        cameraStream?.getTracks().forEach(t => t.stop());
-        cameraOn = false;
-      } else {
-        navigator.mediaDevices.getUserMedia({ video: true }).then(s => {
-          cameraStream = s;
-          $("camera-video").srcObject = s;
-          cameraOn = true;
-          toastMsg("Camera ON");
-        }).catch(() => toastMsg("Camera indisponibilă"));
-      }
-    } else {
-      window[key] = !window[key];
-    }
-    $(`toggle-${name}`).classList.toggle("active");
-  });
-});
+$("toggle-png").onclick = () => { pngOn = !pngOn; $("toggle-png").classList.toggle("active", pngOn); };
+$("toggle-video").onclick = () => { videoFileOn = !videoFileOn; $("toggle-video").classList.toggle("active", videoFileOn); if (videoFileOn) overlayVideo.play().catch(()=>{}); else overlayVideo.pause(); };
+$("toggle-center").onclick = () => { centerOn = !centerOn; $("toggle-center").classList.toggle("active", centerOn); };
+$("toggle-scroll").onclick = () => { scrollOn = !scrollOn; $("toggle-scroll").classList.toggle("active", scrollOn); };
+$("toggle-suggest").onclick = () => { suggestionOn = !suggestionOn; $("toggle-suggest").classList.toggle("active", suggestionOn); };
+$("toggle-camera").onclick = async () => {
+  if (cameraOn) {
+    cameraStream?.getTracks().forEach(t => t.stop());
+    cameraOn = false;
+    $("toggle-camera").classList.remove("active");
+    toastMsg("Camera OFF");
+  } else {
+    try {
+      cameraStream = await navigator.mediaDevices.getUserMedia({ video: true });
+      cameraVideo.srcObject = cameraStream;
+      cameraOn = true;
+      $("toggle-camera").classList.add("active");
+      toastMsg("Camera ON");
+    } catch { toastMsg("Camera indisponibilă"); }
+  }
+};
 
-// Fullscreen + Hide UI
-$("fullscreen-btn").addEventListener("click", () => {
-  if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => toastMsg("Fullscreen nu e permis"));
+// Record + Export
+$("record").onclick = () => {
+  if (recording) {
+    recorder?.stop();
+    recording = false;
+    $("record").textContent = "Record";
+    toastMsg("Recording stopped");
+    return;
+  }
+  const stream = canvas.captureStream(30);
+  chunks = [];
+  recorder = new MediaRecorder(stream, { mimeType: "video/webm" });
+  recorder.ondataavailable = e => chunks.push(e.data);
+  recorder.onstop = () => {
+    const blob = new Blob(chunks, { type: "video/webm" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "visualizer.webm"; a.click();
+    toastMsg("Video descărcat");
+  };
+  recorder.start();
+  recording = true;
+  $("record").textContent = "Stop Rec";
+  toastMsg("Recording...");
+};
+$("export").onclick = () => { if (chunks.length) $("record").click(); else toastMsg("Înregistrează mai întâi"); };
+
+// Fullscreen + Hide
+$("fullscreen-btn").onclick = () => {
+  if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => toastMsg("Fullscreen blocat"));
   else document.exitFullscreen();
-});
-
-$("toggle-ui").addEventListener("click", () => {
+};
+$("toggle-ui").onclick = () => {
   document.body.classList.toggle("ui-hidden");
   $("toggle-ui").textContent = document.body.classList.contains("ui-hidden") ? "👁 Arată comenzi" : "✕ Ascunde comenzi";
-});
+};
 
-// Simple visualizer loop
+// Visualizer loop
 function loop() {
   requestAnimationFrame(loop);
   const w = canvas.width / (window.devicePixelRatio || 1);
   const h = canvas.height / (window.devicePixelRatio || 1);
-  ctx.fillStyle = $("bg-color1").value || "#000";
+  const bg1 = $("bg-color1").value || "#000";
+  const bg2 = $("bg-color2").value || "#202020";
+  if ($("bg-type").value === "gradient") {
+    const g = ctx.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, bg1); g.addColorStop(1, bg2);
+    ctx.fillStyle = g;
+  } else ctx.fillStyle = bg1;
   ctx.fillRect(0, 0, w, h);
+
+  if (cameraOn && cameraVideo.readyState >= 2) ctx.drawImage(cameraVideo, 0, 0, w, h);
+  if (videoFileOn && overlayVideo.readyState >= 2) ctx.drawImage(overlayVideo, 0, 0, w, h);
+  if (scrollOn && scrollImg.complete) {
+    scrollX = (scrollX + 1) % (scrollImg.width || 1);
+    ctx.drawImage(scrollImg, -scrollX, h / 2 - 100, scrollImg.width, 200);
+  }
 
   if ((playing || micOn) && analyser) {
     const data = new Uint8Array(analyser.frequencyBinCount);
@@ -246,33 +271,54 @@ function loop() {
     const color = $("viz-color").value;
     const intensity = parseFloat($("intensity").value);
     ctx.fillStyle = color;
-    if (mode === "bars") {
+    ctx.strokeStyle = color;
+    if (mode === "bars" || mode === "mirror") {
       const barW = w / 64;
       for (let i = 0; i < 64; i++) {
-        const bh = data[i] * intensity * 1.5;
+        const bh = data[i] * intensity * 1.8;
         ctx.fillRect(i * barW, h - bh, barW - 2, bh);
+        if (mode === "mirror") ctx.fillRect(i * barW, 0, barW - 2, bh * 0.6);
       }
-    } else if (mode === "wave") {
+    } else if (mode === "wave" || mode === "radialwave") {
       analyser.getByteTimeDomainData(data);
       ctx.beginPath();
-      ctx.strokeStyle = color;
       for (let i = 0; i < data.length; i++) {
         const x = (i / data.length) * w;
-        const y = (data[i] / 128) * h / 2;
+        const y = (data[i] / 128.0) * h / 2;
         i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
       }
       ctx.stroke();
+    } else if (mode === "radial") {
+      const cx = w / 2, cy = h / 2;
+      for (let i = 0; i < 64; i++) {
+        const ang = (i / 64) * Math.PI * 2;
+        const len = data[i] * intensity * 1.2;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(cx + Math.cos(ang) * len, cy + Math.sin(ang) * len);
+        ctx.stroke();
+      }
     }
   }
 
+  if (centerOn && centerMedia) {
+    const size = Math.min(w, h) * 0.28;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(w / 2, h / 2, size / 2, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.drawImage(centerMedia, w / 2 - size / 2, h / 2 - size / 2, size, size);
+    ctx.restore();
+  }
+  if (pngOn && pngImage.complete) ctx.drawImage(pngImage, w / 2 - 150, h / 2 - 150, 300, 300);
+  if (suggestionOn && suggestionImg) ctx.drawImage(suggestionImg, w - 220, 40, 180, 180);
   if (overlayText) {
     ctx.fillStyle = "#fff";
-    ctx.font = "bold 36px sans-serif";
+    ctx.font = "bold 42px sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText(overlayText, w / 2, h - 80);
+    ctx.fillText(overlayText, w / 2, h - 70);
   }
 }
 loop();
 
-// Init
 refreshMicList();
