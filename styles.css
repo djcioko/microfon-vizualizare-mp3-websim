@@ -1,13 +1,13 @@
 :root { color-scheme: dark; }
 html, body { margin: 0; height: 100%; background: #000; color: #fff; font-family: system-ui, sans-serif; }
-#ui { position: fixed; top: 0; left: 0; right: 0; padding: 12px 14px; background: linear-gradient(180deg, rgba(0,0,0,.85), rgba(0,0,0,0)); z-index: 2; }
-.controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.toggles { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+#ui { position: fixed; top: 0; left: 0; right: 0; padding: 12px 14px; background: linear-gradient(180deg, rgba(0,0,0,.85), transparent); z-index: 2; }
+.controls, .toggles { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.toggles { margin-top: 8px; }
 button, .button, select, input[type="range"], input[type="text"] {
   background: #111; border: 1px solid #222; color: #fff; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 13px;
 }
 button:hover, .button:hover { background: #1c1c1c; }
-.toggle-btn.active { border-color: #4ef05d; background: rgba(78,240,93,.1); }
+.toggle-btn.active { border-color: #4ef05d; background: rgba(78,240,93,.15); }
 #clip-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; gap: 8px; overflow-x: auto; }
 #clip-list li { background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.15); border-radius: 8px; padding: 6px 10px; font-size: 12px; cursor: pointer; }
 #clip-list li.active { border-color: #4ef05d; }
