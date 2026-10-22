@@ -9,11 +9,21 @@
 <body>
   <div id="ui">
     <div class="controls">
-      <label class="button">+ Add Clip<input id="file-input" type="file" accept="audio/*,video/*" multiple hidden></label>
-      <label class="button">+ Center Media<input id="image-input" type="file" accept="image/*,video/*" hidden></label>
-      <label class="button">+ Scrolling Image<input id="scroll-image" type="file" accept="image/*" hidden></label>
-      <label class="button">+ PNG Overlay<input id="png-input" type="file" accept="image/png,image/*" hidden></label>
-      <label class="button">+ Video File<input id="video-file-input" type="file" accept="video/*" hidden></label>
+      <label class="button">+ Add Clip
+        <input id="file-input" type="file" accept="audio/*,video/*" multiple hidden>
+      </label>
+      <label class="button">+ Center Media
+        <input id="image-input" type="file" accept="image/*,video/*" hidden>
+      </label>
+      <label class="button">+ Scrolling Image
+        <input id="scroll-image" type="file" accept="image/*" hidden>
+      </label>
+      <label class="button">+ PNG Overlay
+        <input id="png-input" type="file" accept="image/png,image/*" hidden>
+      </label>
+      <label class="button">+ Video File
+        <input id="video-file-input" type="file" accept="video/*" hidden>
+      </label>
       <button id="add-suggestion">Add Suggestion Image</button>
       <button id="prev">Prev</button>
       <button id="playpause">Play</button>
@@ -21,11 +31,16 @@
       <button id="record">Record</button>
       <button id="export">Export Video</button>
       <button id="next">Next</button>
-      <select id="audio-device"><option value="">🎤 Default Mic</option></select>
+
+      <select id="audio-device" title="Audio Input Device">
+        <option value="">🎤 Default Mic</option>
+      </select>
       <button id="mic-listen">🎤 Listen Mic</button>
+
       <input id="overlay-text" type="text" placeholder="Overlay text..." maxlength="80">
       <button id="apply-text">Add Text</button>
-      <select id="mode">
+
+      <select id="mode" title="Efect vizual">
         <option value="bars">Bars</option>
         <option value="radial">Radial</option>
         <option value="wave">Waveform</option>
@@ -36,13 +51,23 @@
         <option value="mirror">Mirror Bars</option>
         <option value="aurora">Aurora</option>
       </select>
-      <label class="inline">Intensity <input id="intensity" type="range" min="0.5" max="3" step="0.1" value="1.5"></label>
-      <label class="inline">Color <input id="viz-color" type="color" value="#ffffff"></label>
-      <label class="inline"><input id="strobe" type="checkbox" checked> Strobe</label>
-      <select id="bg-type"><option value="solid">Solid</option><option value="gradient">Gradient</option></select>
+      <label class="inline">Intensity
+        <input id="intensity" type="range" min="0.5" max="3" step="0.1" value="1.5">
+      </label>
+      <label class="inline">Color
+        <input id="viz-color" type="color" value="#ffffff">
+      </label>
+      <label class="inline">
+        <input id="strobe" type="checkbox" checked> Strobe
+      </label>
+      <select id="bg-type">
+        <option value="solid">Solid</option>
+        <option value="gradient">Gradient</option>
+      </select>
       <label class="inline">BG Color 1 <input id="bg-color1" type="color" value="#000000"></label>
       <label class="inline">BG Color 2 <input id="bg-color2" type="color" value="#202020"></label>
     </div>
+
     <div class="toggles">
       <button id="toggle-png" class="toggle-btn"><span class="dot"></span> PNG Overlay</button>
       <button id="toggle-video" class="toggle-btn"><span class="dot"></span> Video File</button>
@@ -51,15 +76,19 @@
       <button id="toggle-scroll" class="toggle-btn"><span class="dot"></span> Scroll</button>
       <button id="toggle-suggest" class="toggle-btn"><span class="dot"></span> Suggestion</button>
     </div>
+
     <div id="current-track-display">Sursă: Nicio piesă încărcată</div>
     <ul id="clip-list"></ul>
   </div>
+
   <div id="dock">
     <button id="toggle-ui">✕ Ascunde comenzi</button>
     <button id="fullscreen-btn">⛶</button>
   </div>
+
   <div id="status-toast"></div>
   <canvas id="canvas"></canvas>
+
   <audio id="hidden-audio" crossorigin="anonymous"></audio>
   <video id="hidden-video" crossorigin="anonymous" playsinline></video>
   <video id="overlay-video" crossorigin="anonymous" playsinline muted loop></video>
@@ -67,6 +96,7 @@
   <img id="png-image" alt="" style="display:none">
   <img id="scroll-img" alt="" style="display:none">
   <img id="center-media" alt="" style="display:none">
+
   <script src="./app.js"></script>
 </body>
 </html>
