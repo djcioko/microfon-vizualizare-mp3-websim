@@ -23,6 +23,29 @@ let videoFileOn = false;
 let recorder = null, chunks = [], recording = false;
 let scrollX = 0;
 
+// Free form positions (drag with mouse)
+let pngPos = { x: 0.5, y: 0.5, scale: 1 };
+let textPos = { x: 0.5, y: 0.85 };
+let centerPos = { x: 0.5, y: 0.5, scale: 1 };
+let dragging = null;
+let dragOffset = { x: 0, y: 0 };
+
+// Particles
+let particles = [];
+function spawnParticles(n = 3) {
+  for (let i = 0; i < n; i++) {
+    particles.push({
+      x: Math.random() * canvas.width,
+      y: canvas.height,
+      vx: (Math.random() - 0.5) * 4,
+      vy: -Math.random() * 6 - 2,
+      life: 1,
+      size: Math.random() * 6 + 2,
+      color: $("viz-color").value
+    });
+  }
+}
+
 function toastMsg(msg) {
   toast.textContent = msg;
   toast.classList.add("show");
@@ -39,6 +62,41 @@ function resize() {
 }
 resize();
 window.addEventListener("resize", resize);
+
+// Mouse free-form drag
+canvas.addEventListener("mousedown", e => {
+  const rect = canvas.getBoundingClientRect();
+  const mx = (e.clientX - rect.left) / rect.width;
+  const my = (e.clientY - rect.top) / rect.height;
+
+  // Check PNG
+  if (pngOn && Math.abs(mx - pngPos.x) < 0.15 && Math.abs(my - pngPos.y) < 0.15) {
+    dragging = "png";
+    dragOffset = { x: mx - pngPos.x, y: my - pngPos.y };
+  }
+  // Check Text
+  else if (overlayText && Math.abs(mx - textPos.x) < 0.2 && Math.abs(my - textPos.y) < 0.08) {
+    dragging = "text";
+    dragOffset = { x: mx - textPos.x, y: my - textPos.y };
+  }
+  // Check Center
+  else if (centerOn && centerMedia && Math.abs(mx - centerPos.x) < 0.15 && Math.abs(my - centerPos.y) < 0.15) {
+    dragging = "center";
+    dragOffset = { x: mx - centerPos.x, y: my - centerPos.y };
+  }
+});
+
+window.addEventListener("mousemove", e => {
+  if (!dragging) return;
+  const rect = canvas.getBoundingClientRect();
+  const mx = (e.clientX - rect.left) / rect.width;
+  const my = (e.clientY - rect.top) / rect.height;
+  if (dragging === "png") { pngPos.x = mx - dragOffset.x; pngPos.y = my - dragOffset.y; }
+  if (dragging === "text") { textPos.x = mx - dragOffset.x; textPos.y = my - dragOffset.y; }
+  if (dragging === "center") { centerPos.x = mx - dragOffset.x; centerPos.y = my - dragOffset.y; }
+});
+
+window.addEventListener("mouseup", () => dragging = null);
 
 async function ensureAudio() {
   if (!audioCtx) {
@@ -67,12 +125,10 @@ async function refreshMicList() {
     });
     if (current) audioDeviceSel.value = current;
     toastMsg(mics.length ? `${mics.length} microfoane` : "Niciun microfon");
-  } catch (e) {
-    toastMsg("Permisiune microfon refuzată");
-  }
+  } catch (e) { toastMsg("Permisiune microfon refuzată"); }
 }
 
-// Clips
+// Clips (neschimbat)
 $("file-input").addEventListener("change", e => {
   [...e.target.files].forEach(file => {
     const url = URL.createObjectURL(file);
@@ -121,7 +177,7 @@ $("stop").addEventListener("click", () => {
 $("prev").addEventListener("click", () => { if (clips.length) { index = (index - 1 + clips.length) % clips.length; playCurrent(); } });
 $("next").addEventListener("click", () => { if (clips.length) { index = (index + 1) % clips.length; playCurrent(); } });
 
-// Mic
+// Mic (neschimbat)
 micListenBtn.addEventListener("click", async () => {
   await ensureAudio();
   if (micOn) {
@@ -146,104 +202,69 @@ micListenBtn.addEventListener("click", async () => {
   } catch (e) { toastMsg("Microfon indisponibil"); }
 });
 
-// Media overlays — se activează automat la încărcare
+// Media overlays (se activează automat)
 $("image-input").addEventListener("change", e => {
   const f = e.target.files[0]; if (!f) return;
   const img = new Image();
-  img.onload = () => {
-    centerMedia = img;
-    centerOn = true;
-    $("toggle-center").classList.add("active");
-    toastMsg("Center media activat");
-  };
-  img.src = URL.createObjectURL(f);
-  e.target.value = "";
+  img.onload = () => { centerMedia = img; centerOn = true; $("toggle-center").classList.add("active"); toastMsg("Center activat"); };
+  img.src = URL.createObjectURL(f); e.target.value = "";
 });
-
 $("png-input").addEventListener("change", e => {
   const f = e.target.files[0]; if (!f) return;
-  pngImage.onload = () => {
-    pngOn = true;
-    $("toggle-png").classList.add("active");
-    toastMsg("PNG Overlay activat");
-  };
-  pngImage.src = URL.createObjectURL(f);
-  e.target.value = "";
+  pngImage.onload = () => { pngOn = true; $("toggle-png").classList.add("active"); toastMsg("PNG activat"); };
+  pngImage.src = URL.createObjectURL(f); e.target.value = "";
 });
-
 $("scroll-image").addEventListener("change", e => {
   const f = e.target.files[0]; if (!f) return;
-  scrollImg.onload = () => {
-    scrollOn = true;
-    $("toggle-scroll").classList.add("active");
-    toastMsg("Scrolling Image activat");
-  };
-  scrollImg.src = URL.createObjectURL(f);
-  e.target.value = "";
+  scrollImg.onload = () => { scrollOn = true; $("toggle-scroll").classList.add("active"); toastMsg("Scroll activat"); };
+  scrollImg.src = URL.createObjectURL(f); e.target.value = "";
 });
-
 $("video-file-input").addEventListener("change", e => {
   const f = e.target.files[0]; if (!f) return;
   overlayVideo.src = URL.createObjectURL(f);
   overlayVideo.play().catch(() => {});
   videoFileOn = true;
   $("toggle-video").classList.add("active");
-  toastMsg("Video File activat");
+  toastMsg("Video activat");
   e.target.value = "";
 });
-
 $("add-suggestion").addEventListener("click", () => {
   const img = new Image();
-  img.onload = () => {
-    suggestionImg = img;
-    suggestionOn = true;
-    $("toggle-suggest").classList.add("active");
-    toastMsg("Suggestion activat");
-  };
+  img.onload = () => { suggestionImg = img; suggestionOn = true; $("toggle-suggest").classList.add("active"); toastMsg("Suggestion activat"); };
   img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400"><circle cx="200" cy="200" r="150" fill="#4ef05d"/><text x="200" y="220" text-anchor="middle" font-size="60" fill="#000">VIZ</text></svg>`);
 });
-
 $("apply-text").addEventListener("click", () => {
   overlayText = $("overlay-text").value.trim();
-  if (overlayText) toastMsg("Text adăugat");
+  if (overlayText) toastMsg("Text adăugat (trage cu mouse-ul)");
 });
 
-// Toggles (on/off)
+// Toggles
 $("toggle-png").onclick = () => { pngOn = !pngOn; $("toggle-png").classList.toggle("active", pngOn); };
-$("toggle-video").onclick = () => {
-  videoFileOn = !videoFileOn;
-  $("toggle-video").classList.toggle("active", videoFileOn);
-  if (videoFileOn) overlayVideo.play().catch(() => {});
-  else overlayVideo.pause();
-};
+$("toggle-video").onclick = () => { videoFileOn = !videoFileOn; $("toggle-video").classList.toggle("active", videoFileOn); if (videoFileOn) overlayVideo.play().catch(()=>{}); else overlayVideo.pause(); };
 $("toggle-center").onclick = () => { centerOn = !centerOn; $("toggle-center").classList.toggle("active", centerOn); };
 $("toggle-scroll").onclick = () => { scrollOn = !scrollOn; $("toggle-scroll").classList.toggle("active", scrollOn); };
 $("toggle-suggest").onclick = () => { suggestionOn = !suggestionOn; $("toggle-suggest").classList.toggle("active", suggestionOn); };
-
 $("toggle-camera").onclick = async () => {
   if (cameraOn) {
     cameraStream?.getTracks().forEach(t => t.stop());
     cameraOn = false;
     $("toggle-camera").classList.remove("active");
-    toastMsg("Camera OFF");
   } else {
     try {
       cameraStream = await navigator.mediaDevices.getUserMedia({ video: true });
       cameraVideo.srcObject = cameraStream;
       cameraOn = true;
       $("toggle-camera").classList.add("active");
-      toastMsg("Camera ON");
     } catch { toastMsg("Camera indisponibilă"); }
   }
 };
 
-// Record + Export
+// Record
 $("record").onclick = () => {
   if (recording) {
     recorder?.stop();
     recording = false;
     $("record").textContent = "Record";
-    toastMsg("Recording oprit");
     return;
   }
   const stream = canvas.captureStream(30);
@@ -252,25 +273,21 @@ $("record").onclick = () => {
   recorder.ondataavailable = e => chunks.push(e.data);
   recorder.onstop = () => {
     const blob = new Blob(chunks, { type: "video/webm" });
-    const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = "visualizer.webm"; a.click();
+    a.href = URL.createObjectURL(blob);
+    a.download = "visualizer.webm";
+    a.click();
     toastMsg("Video descărcat");
   };
   recorder.start();
   recording = true;
   $("record").textContent = "Stop Rec";
-  toastMsg("Recording...");
 };
-$("export").onclick = () => {
-  if (recording) $("record").click();
-  else if (chunks.length) toastMsg("Folosește Record mai întâi");
-  else toastMsg("Înregistrează mai întâi");
-};
+$("export").onclick = () => { if (recording) $("record").click(); else toastMsg("Pornește Record mai întâi"); };
 
-// Fullscreen + Hide UI (rămân unde sunt)
+// Fullscreen + Hide
 $("fullscreen-btn").onclick = () => {
-  if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => toastMsg("Fullscreen blocat"));
+  if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {});
   else document.exitFullscreen();
 };
 $("toggle-ui").onclick = () => {
@@ -278,7 +295,7 @@ $("toggle-ui").onclick = () => {
   $("toggle-ui").textContent = document.body.classList.contains("ui-hidden") ? "👁 Arată comenzi" : "✕ Ascunde comenzi";
 };
 
-// Visualizer loop — toate modurile + overlay-urile
+// LOOP cu pulse + free form + efecte complete
 function loop() {
   requestAnimationFrame(loop);
   const w = canvas.width / (window.devicePixelRatio || 1);
@@ -302,9 +319,12 @@ function loop() {
     ctx.drawImage(scrollImg, scrollImg.width - scrollX, h / 2 - 80, scrollImg.width, 160);
   }
 
+  let bass = 0;
   if ((playing || micOn) && analyser) {
     const data = new Uint8Array(analyser.frequencyBinCount);
     analyser.getByteFrequencyData(data);
+    bass = data.slice(0, 20).reduce((a, b) => a + b, 0) / 20 / 255;
+
     const mode = $("mode").value;
     const color = $("viz-color").value;
     const intensity = parseFloat($("intensity").value);
@@ -332,7 +352,7 @@ function loop() {
       const cx = w / 2, cy = h / 2;
       for (let i = 0; i < 64; i++) {
         const ang = (i / 64) * Math.PI * 2;
-        const len = data[i] * intensity * 1.3;
+        const len = data[i] * intensity * 1.4;
         ctx.beginPath();
         ctx.moveTo(cx, cy);
         ctx.lineTo(cx + Math.cos(ang) * len, cy + Math.sin(ang) * len);
@@ -340,8 +360,8 @@ function loop() {
       }
     } else if (mode === "rings") {
       const cx = w / 2, cy = h / 2;
-      for (let i = 0; i < 20; i++) {
-        const r = (data[i * 3] / 255) * Math.min(w, h) * 0.45 * intensity;
+      for (let i = 0; i < 24; i++) {
+        const r = (data[i * 2] / 255) * Math.min(w, h) * 0.42 * intensity;
         ctx.beginPath();
         ctx.arc(cx, cy, r, 0, Math.PI * 2);
         ctx.stroke();
@@ -349,41 +369,82 @@ function loop() {
     } else if (mode === "spiral") {
       const cx = w / 2, cy = h / 2;
       ctx.beginPath();
-      for (let i = 0; i < 200; i++) {
-        const ang = i * 0.15;
-        const r = (data[i % data.length] / 255) * 180 * intensity + i * 0.8;
+      for (let i = 0; i < 250; i++) {
+        const ang = i * 0.18;
+        const r = (data[i % data.length] / 255) * 200 * intensity + i * 0.9;
         const x = cx + Math.cos(ang) * r;
         const y = cy + Math.sin(ang) * r;
         i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
       }
       ctx.stroke();
+    } else if (mode === "particles") {
+      if (Math.random() < bass * 0.6) spawnParticles(2);
+    } else if (mode === "aurora") {
+      ctx.globalAlpha = 0.6;
+      for (let i = 0; i < 8; i++) {
+        const y = (data[i * 10] / 255) * h * 0.6 + h * 0.2;
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        for (let x = 0; x < w; x += 20) {
+          const ny = y + Math.sin(x * 0.02 + i) * 40 * intensity;
+          ctx.lineTo(x, ny);
+        }
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
     }
   }
 
+  // Update particles
+  particles = particles.filter(p => p.life > 0);
+  particles.forEach(p => {
+    p.x += p.vx; p.y += p.vy; p.vy += 0.05; p.life -= 0.012;
+    ctx.fillStyle = p.color;
+    ctx.globalAlpha = p.life;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  });
+
+  // PNG cu pulse / jump
+  if (pngOn && pngImage.complete && pngImage.width) {
+    const pulse = 1 + bass * 0.35;
+    const size = Math.min(w, h) * 0.32 * pulse * pngPos.scale;
+    const px = pngPos.x * w - size / 2;
+    const py = pngPos.y * h - size / 2 - bass * 30; // jump
+    ctx.drawImage(pngImage, px, py, size, size);
+  }
+
+  // Center cu pulse
   if (centerOn && centerMedia) {
-    const size = Math.min(w, h) * 0.3;
+    const pulse = 1 + bass * 0.25;
+    const size = Math.min(w, h) * 0.28 * pulse * centerPos.scale;
+    const cx = centerPos.x * w;
+    const cy = centerPos.y * h - bass * 20;
     ctx.save();
     ctx.beginPath();
-    ctx.arc(w / 2, h / 2, size / 2, 0, Math.PI * 2);
+    ctx.arc(cx, cy, size / 2, 0, Math.PI * 2);
     ctx.clip();
-    ctx.drawImage(centerMedia, w / 2 - size / 2, h / 2 - size / 2, size, size);
+    ctx.drawImage(centerMedia, cx - size / 2, cy - size / 2, size, size);
     ctx.restore();
   }
-  if (pngOn && pngImage.complete && pngImage.width) {
-    const size = Math.min(w, h) * 0.35;
-    ctx.drawImage(pngImage, w / 2 - size / 2, h / 2 - size / 2, size, size);
-  }
+
   if (suggestionOn && suggestionImg) {
-    ctx.drawImage(suggestionImg, w - 200, 30, 160, 160);
+    ctx.drawImage(suggestionImg, w - 190, 30, 150, 150);
   }
+
+  // Text cu pulse / jump + free form
   if (overlayText) {
+    const pulse = 1 + bass * 0.4;
+    ctx.save();
     ctx.fillStyle = "#fff";
-    ctx.font = "bold 42px sans-serif";
+    ctx.font = `bold ${42 * pulse}px sans-serif`;
     ctx.textAlign = "center";
     ctx.shadowColor = "#000";
-    ctx.shadowBlur = 8;
-    ctx.fillText(overlayText, w / 2, h - 70);
-    ctx.shadowBlur = 0;
+    ctx.shadowBlur = 10;
+    ctx.fillText(overlayText, textPos.x * w, textPos.y * h - bass * 25);
+    ctx.restore();
   }
 }
 loop();
