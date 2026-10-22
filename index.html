@@ -1,66 +1,55 @@
-// ── MICROFOANE ──
-async function refreshMicList() {
-  try {
-    // Cere permisiune (necesar ca să apară etichetele)
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    stream.getTracks().forEach(t => t.stop()); // oprim imediat, doar am vrut permisiunea
+<!doctype html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Custom Song Visualizer</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div id="ui">
+    <div class="controls">
+      <label class="button">+ Add Clip
+        <input id="file-input" type="file" accept="audio/*,video/*" multiple hidden>
+      </label>
+      <button id="prev">Prev</button>
+      <button id="playpause">Play</button>
+      <button id="stop">Stop</button>
+      <button id="next">Next</button>
+      <button id="record">Record</button>
+      <button id="export">Export Video</button>
 
-    const devices = await navigator.mediaDevices.enumerateDevices();
-    const mics = devices.filter(d => d.kind === "audioinput");
+      <select id="audio-device" title="Microfon">
+        <option value="">🎤 Default Mic</option>
+      </select>
+      <button id="mic-listen">🎤 Listen Mic</button>
 
-    const current = audioDeviceSel.value;
-    audioDeviceSel.innerHTML = `<option value="">🎤 Default Mic</option>`;
+      <select id="mode">
+        <option value="bars">Bars</option>
+        <option value="radial">Radial</option>
+        <option value="wave">Waveform</option>
+        <option value="particles">Particles</option>
+      </select>
+      <label class="inline">Intensity
+        <input id="intensity" type="range" min="0.5" max="3" step="0.1" value="1.5">
+      </label>
+      <label class="inline">Color
+        <input id="viz-color" type="color" value="#ffffff">
+      </label>
+    </div>
+    <div id="current-track-display">Sursă: Nicio piesă</div>
+    <ul id="clip-list"></ul>
+  </div>
 
-    mics.forEach((d, i) => {
-      const opt = document.createElement("option");
-      opt.value = d.deviceId;
-      opt.textContent = d.label || `Microfon ${i + 1}`;
-      audioDeviceSel.appendChild(opt);
-    });
+  <div id="dock">
+    <button id="toggle-ui">✕ Ascunde comenzi</button>
+    <button id="fullscreen-btn">⛶ Fullscreen</button>
+  </div>
 
-    if (current) audioDeviceSel.value = current;
-    toastMsg(mics.length ? `${mics.length} microfoane găsite` : "Niciun microfon găsit");
-  } catch (err) {
-    console.warn(err);
-    toastMsg("Permisiune microfon refuzată sau indisponibil");
-  }
-}
+  <div id="status-toast"></div>
+  <canvas id="canvas"></canvas>
 
-// Populează lista când utilizatorul interacționează
-micListenBtn.addEventListener("click", async () => {
-  await ensureAudio();
-  if (state.micOn) {
-    // oprește microfonul (codul tău existent)
-    state.micSource?.disconnect();
-    state.micStream?.getTracks().forEach(t => t.stop());
-    state.micOn = false;
-    micListenBtn.classList.remove("active");
-    micListenBtn.textContent = "🎤 Listen Mic";
-    updateTrackLabel();
-    return;
-  }
-
-  // Înainte de a porni, reîmprospătează lista (cere permisiune dacă e nevoie)
-  await refreshMicList();
-
-  try {
-    const constraints = {
-      audio: audioDeviceSel.value
-        ? { deviceId: { exact: audioDeviceSel.value } }
-        : true,
-      video: false
-    };
-    state.micStream = await navigator.mediaDevices.getUserMedia(constraints);
-    state.micSource = state.audioCtx.createMediaStreamSource(state.micStream);
-    state.micSource.connect(state.analyser);
-    state.micOn = true;
-    micListenBtn.classList.add("active");
-    micListenBtn.textContent = "🎤 Mic ON";
-    updateTrackLabel();
-  } catch (e) {
-    toastMsg("Microfon indisponibil: " + e.message);
-  }
-});
-
-// Opțional: reîmprospătează lista și când se schimbă dispozitivele
-navigator.mediaDevices?.addEventListener?.("devicechange", refreshMicList);
+  <audio id="hidden-audio" crossorigin="anonymous"></audio>
+  <script src="./app.js"></script>
+</body>
+</html>
